@@ -1,0 +1,9 @@
+{
+  "scripts": {
+    "start": "nodemon --watch ../lib app.js"
+  },
+  "dependencies": {
+    "express": "^4.16.2",
+    "nodemon": "^1.17.1"
+  }
+}
