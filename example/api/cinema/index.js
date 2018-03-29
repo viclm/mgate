@@ -4,7 +4,10 @@ exports.post = {
       url: 'https://etmdb.com/graphql',
       method: 'post',
       datatype: 'json',
-      timeout: 5000
+      timeout: 1000,
+      fallback() {
+        return []
+      }
     }
   ]
 }

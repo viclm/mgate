@@ -16,6 +16,7 @@ options = {
   when(context)
   before(context)
   after(context)
+  fallback(context)
   fake(context)
 }
 
