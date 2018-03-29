@@ -1,10 +1,10 @@
 exports.post = {
-  serial: [
+  rules: [
     {
       url: 'https://etmdb.com/graphql',
       method: 'post',
       datatype: 'json',
-      timeout: 1000
+      timeout: 5000
     }
   ]
 }
