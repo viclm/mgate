@@ -15,6 +15,7 @@
   },
   "keywords": [
     "http",
-    "proxy"
+    "proxy",
+    "middleware"
   ]
 }
