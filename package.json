@@ -1,17 +1,39 @@
 {
   "name": "httproxy",
-  "description": "http proxy middleware for express",
+  "description": "A HTTP proxy middleware for merge request",
   "version": "0.0.1-alpha.0",
   "engines": {
     "node": ">=6.12.3"
   },
   "repository": "viclm/httproxy",
   "license": "MIT",
+  "scripts": {
+    "test": "node node_modules/ava/cli.js test"
+  },
+  "ava": {
+    "babel": {
+      "presets": [
+        [
+          "env",
+          {
+            "targets": {
+              "node": "6.12.3"
+            }
+          }
+        ]
+      ]
+    }
+  },
   "dependencies": {
     "debug": "^3.1.0",
     "express": "^4.16.2",
     "form-data": "^2.3.2",
     "multer": "^1.3.0"
+  },
+  "devDependencies": {
+    "ava": "^0.25.0",
+    "babel-preset-env": "^1.6.1",
+    "sinon": "^4.4.9"
   },
   "keywords": [
     "http",
