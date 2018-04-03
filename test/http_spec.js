@@ -37,7 +37,7 @@ test.afterEach.always(t => {
   server.close()
 })
 
-test.serial('callback', async t => {
+test.serial('node-style error-first callback API', async t => {
   t.plan(4)
 
   server.on('/api/1', (req, res) => {
@@ -79,7 +79,7 @@ test.serial('GET is used default', async t => {
 
 })
 
-test.serial('POST is used application/x-www-form-urlencoded default', async t => {
+test.serial('POST uses application/x-www-form-urlencoded default', async t => {
   t.plan(2)
 
   server.on('/api/1', (req, res) => {
@@ -150,7 +150,7 @@ test.serial('send data', async t => {
 
 })
 
-test.serial('json', async t => {
+test.serial('application/json', async t => {
   t.plan(2)
 
   server.on('/api/1', (req, res) => {
@@ -178,7 +178,7 @@ test.serial('json', async t => {
 
 })
 
-test.serial('formdata', async t => {
+test.serial('multipart/form-data', async t => {
   t.plan(2)
 
   server.on('/api/1', (req, res) => {
