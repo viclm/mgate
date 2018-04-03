@@ -8,7 +8,7 @@
   "repository": "viclm/httproxy",
   "license": "MIT",
   "scripts": {
-    "test": "node node_modules/ava/cli.js test"
+    "test": "node node_modules/ava/cli.js test --verbose"
   },
   "ava": {
     "babel": {
