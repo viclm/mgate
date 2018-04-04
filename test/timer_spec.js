@@ -1,6 +1,6 @@
 const test = require('ava')
 const sinon = require('sinon')
-const timer = require('../lib/utils/timer')
+const timer = require('../lib/util/timer')
 
 let clock
 

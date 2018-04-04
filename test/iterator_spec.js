@@ -1,6 +1,6 @@
 const test = require('ava')
 const sinon = require('sinon')
-const iterator = require('../lib/utils/iterator')
+const iterator = require('../lib/util/iterator')
 
 test('run tasks serial', t => {
   const queue = [1, 2, 3, 4, 5]
