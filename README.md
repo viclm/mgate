@@ -1,31 +1,27 @@
 # Httproxy
 
+Powerful HTTP proxy middleware for Express.
+
 [![Build Status](https://travis-ci.org/viclm/httproxy.svg?branch=master)](https://travis-ci.org/viclm/httproxy)
 
-A HTTP proxy middleware for Express. It supports batch interface forwarding, which means you can merge multiple interface to single one, this is especially useful for client request.
+## Features
 
-This proxy is very convenient to use, only several options are required to make a complicated proxy request. You can provide a fallback function when upstream interface is unavailable, it may fail immediately when circuit breaks and recover when available.
+- Merge multiple requests to single one
+- Serial, parallel or mixed
+- Simple syntax and easy to test
+- A circuit breaker is built-in
 
-## Table of contents
+## Installation
 
-- [Install](#install)
-- [Usage](#usage)
-- [Options](#options)
-- [Proxy settings](#proxy-settings)
-- [Contributing](#contributing)
-- [License](#license)
+Node.js 6.12.3 or higher is required.
 
-## Install
-
-You can install it via **Yarn**
+Install it with yarn
 
 ```shell
 yarn add httproxy
 ```
 
 ## Usage
-
-The code below start an Express server, a httproxy middleware is used by specifying an `api` directory (which is the default) to define proxy settings. The `list.js` in `api` directory defines a GET request, any request targeting `/api/news/list` will be proxyed to `http://upstream.com/gateway/news/list`.
 
 ### app.js
 
@@ -34,35 +30,56 @@ const express = require('express')
 const httproxy = require('httproxy')
 
 const app = express()
+// init httproxy with an api directory
 const proxy = httproxy({ api: 'api'})
 
 app.use(proxy)
 app.listen(4869)
 ```
 
-### api/news/list.js
+### api/news/detail.js
 
 ```javascript
+// handle incoming GET request from /api/news/detail
 exports.get = {
+  // merge two upstream requests to one
   rules: [
     {
-      url: 'http://upstream.com/gateway/news/list'
+      url: 'http://upstream.com/gateway/news/detail'
+    },
+    {
+      url: 'http://upstream.com/gateway/news/comment',
+      // this request depends last request result
+      before(context) {
+        return {
+          data: { news_id: context.parent.id }
+        }
+      },
+      // merge the two request results to client
+      after(context) {
+        return {
+          detail: context.parent,
+          comment: context.result
+        }
+      }
     }
   ]
 }
 ```
 
-## Options
+## Global Options
 
 ### `api`
 
-Directory for proxy definition. Httproxy will lookup every JavaScript file in this directory and generate corresponding router functions. The name of directory is used by router path prefix, `/data/` is routing while using a `data` directory.
+Httproxy will lookup every javascript file in this directory, generate corresponding router functions and use the file path as the route. For example, `api/news/detail.js` route `/api/news/detail`, and `api/news/index.js` route `/api/news` or `/api/news/*`.
 
 ### `circuitbreaker`
 
-There is a circuit breaker service running in backend, you can disable it in development.
+There is a circuit breaker service running in the backend, you can disable it in development.
 
-## Proxy settings
+## Proxy Options
+
+Proxy options are exported by HTTP method name, you can export multiple options for different methods.
 
 ### `formdata`
 
@@ -70,29 +87,25 @@ Set it true to receive form-data request.
 
 ### `rules`
 
-A collection of proxy requests would run serially. Every item is a full request definition, it is worth to be mentioned that you can specify an array of proxy requests running in parallel.All request options are listed below, some are self-explanatory.
+A collection of upstream requests would run serially. Every item is a full request definition, array requests would run in parallel. All request options are listed below, most of them are self-explanatory, return a Promise in option function make it async.
 
 * `url`
 * `method`
 * `datatype` specify datatype for response, `form-data` and `json` is supported
-* `timeout` set milliseconds before a request times out
-* `when(context)` stops current request when rejected or a false returned
-* `before(context)` modify current request options
-* `after(context)` modify current request result
-* `fallback(context)` return a fallback data when request fails
-* `fake(context)` custom a result
+* `timeout` set milliseconds before request times out
+* `when(context)` determine request is skipped or not
+* `before(context)` modify request options
+* `after(context)` modify request result
+* `fallback(context)` provide fallback data when request fails
+* `fake(context)` custom result thoroughly
 
 The `context` object has several properties
 
 * `client` contains original request data from client
-* `parent` contains result of latest proxy request
-* `request` contains options for following proxy request
-* `result` contains the result of current proxy request
-
-
-## Contributing
-Welcome to contributing, the guidelines are being drafted.
-
+* `parent` contains result of latest request
+* `request` contains options for following request
+* `result` contains the result of current request
 
 ## License
+
 Licensed under the MIT license.
