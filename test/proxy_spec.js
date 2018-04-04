@@ -1,9 +1,9 @@
 const test = require('ava')
 const sinon = require('sinon')
 const express = require('express')
-const util = require('util')
+const pify = require('pify')
 const option = require('../lib/util/option')
-const proxy = util.promisify(require('../lib/proxy'))
+const proxy = pify(require('../lib/proxy'))
 
 let app
 let server

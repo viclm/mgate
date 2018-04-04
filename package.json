@@ -1,7 +1,7 @@
 {
   "name": "httproxy",
   "description": "A HTTP proxy middleware for merge request",
-  "version": "0.0.1-alpha.0",
+  "version": "0.1.0",
   "engines": {
     "node": ">=6.12.3"
   },
@@ -33,6 +33,7 @@
   "devDependencies": {
     "ava": "^0.25.0",
     "babel-preset-env": "^1.6.1",
+    "pify": "^3.0.0",
     "sinon": "^4.4.9"
   },
   "keywords": [
