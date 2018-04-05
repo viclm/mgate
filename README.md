@@ -106,6 +106,10 @@ The `context` object has several properties
 * `request` contains options for following request
 * `result` contains the result of current request
 
+## Koa
+
+Although this is a middleware for Express, you can still use it in Koa or other frameworks.
+
 ## License
 
 Licensed under the MIT license.
