@@ -10,3 +10,5 @@ branches:
 
 notifications:
   email: false
+
+after_success: yarn coveralls

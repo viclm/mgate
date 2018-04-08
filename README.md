@@ -3,6 +3,7 @@
 简单易用的 HTTP 转发工具，可将多个 API 接口合并成单一请求，减少客户端并发请求数量。
 
 [![Build Status](https://travis-ci.org/viclm/httproxy.svg?branch=master)](https://travis-ci.org/viclm/httproxy)
+[![Coverage Status](https://coveralls.io/repos/github/viclm/httproxy/badge.svg?branch=master)](https://coveralls.io/github/viclm/httproxy?branch=master)
 
 ## 特点
 
