@@ -1,27 +1,26 @@
 # Httproxy
 
-Powerful HTTP proxy middleware for Express.
+简单易用的 HTTP 转发工具，可将多个 API 接口合并成单一请求，减少客户端并发请求数量。
 
 [![Build Status](https://travis-ci.org/viclm/httproxy.svg?branch=master)](https://travis-ci.org/viclm/httproxy)
 
-## Features
+## 特点
 
-- Merge multiple requests to single one
-- Serial, parallel or mixed
-- Simple syntax and easy to test
-- A circuit breaker is built-in
+- 多个请求合并成一个请求
+- 支持串行、并行和混合合并
+- 语法简单易测试
+- 内置熔断恢复机制
+- 适配 Express 中间件，可独立使用
 
-## Installation
+## 安装
 
-Node.js 6.12.3 or higher is required.
-
-Install it with yarn
+要求 Node.js 6.12.3 或更高版本
 
 ```shell
 yarn add httproxy
 ```
 
-## Usage
+## 作为 Express 中间件使用
 
 ### app.js
 
@@ -30,7 +29,7 @@ const express = require('express')
 const httproxy = require('httproxy')
 
 const app = express()
-// init httproxy with an api directory
+// 初始化 Httproxy，指定文件夹 api 作为接口定义目录
 const proxy = httproxy({ api: 'api'})
 
 app.use(proxy)
@@ -40,22 +39,22 @@ app.listen(4869)
 ### api/news/detail.js
 
 ```javascript
-// handle incoming GET request from /api/news/detail
+// 处理来自于路由 /api/news/detail 的 GET 请求
 exports.get = {
-  // merge two upstream requests to one
+  // 将2个上游 API 合并成单个请求
   rules: [
     {
       url: 'http://upstream.com/gateway/news/detail'
     },
     {
       url: 'http://upstream.com/gateway/news/comment',
-      // this request depends last request result
+      // 使用前一个请求的结果配置本次请求参数
       before(context) {
         return {
           data: { news_id: context.parent.id }
         }
       },
-      // merge the two request results to client
+      // 将两次请求的结果合并发送到客户端
       after(context) {
         return {
           detail: context.parent,
@@ -67,49 +66,62 @@ exports.get = {
 }
 ```
 
-## Global Options
+## 全局配置
 
 ### `api`
 
-Httproxy will lookup every javascript file in this directory, generate corresponding router functions and use the file path as the route. For example, `api/news/detail.js` route `/api/news/detail`, and `api/news/index.js` route `/api/news` or `/api/news/*`.
+该目录下包含了所有的转发规则文件。Httproxy 使用文件路径作为路由，通过暴露同名属性接收对应的 HTTP 方法类型。举个例子， `api/news/detail.js` 文件会接收来自于路由 `/api/news/detail` 的请求，如果要处理 `GET` 类型，只需配置 `exports.get` 即可。特别的，`index.js` 文件会处理当前目录的请求。
 
 ### `circuitbreaker`
 
-There is a circuit breaker service running in the backend, you can disable it in development.
+熔断机制开关，默认开启。
 
-## Proxy Options
+## 转发规则
 
-Proxy options are exported by HTTP method name, you can export multiple options for different methods.
+在规则定义模块中暴露同名属性来接收对应的 HTTP 方法类型。
 
 ### `formdata`
 
-Set it true to receive form-data request.
+处理客户端 `form-data` 类型的请求数据
 
 ### `rules`
 
-A collection of upstream requests would run serially. Every item is a full request definition, array requests would run in parallel. All request options are listed below, most of them are self-explanatory, return a Promise in option function make it async.
+转发的目标请求列表，每个请求串行发送，中间有问题会立即返回。如果要并行发送，将某一步的单个请求配置成数组形式即可。单个请求的配置项较多但是大多能够自解释，函数型的选项可以通过 `return` 返回处理结果，或者返回一个 Promise 进行异步化操作。
 
-* `url`
-* `method`
-* `datatype` specify datatype for response, `form-data` and `json` is supported
-* `timeout` set milliseconds before request times out
-* `when(context)` determine request is skipped or not
-* `before(context)` modify request options
-* `after(context)` modify request result
-* `fallback(context)` provide fallback data when request fails
-* `fake(context)` custom result thoroughly
+### 请求选项
 
-The `context` object has several properties
+#### `url`
+#### `method`
+#### `datatype`
+指定数据类型，目前支持 form-data 和 json 两种
+#### `timeout`
+设置请求延时
+#### `when(context)`
+判断是否可跳过该次请求
+#### `before(context)`
+在请求之前修改请求参数
+#### `after(context)`
+修改请求结果
+#### `fallback(context)`
+当请求不可用时提供降级数据
+#### `fake(context)`
+完全自定义请求结果，无视以上所有配置
 
-* `client` contains original request data from client
-* `parent` contains result of latest request
-* `request` contains options for following request
-* `result` contains the result of current request
+**Context 对象包含一些必要的上下文环境数据，可用于配置单个请求**
+
+- `client` 包含原始客户端请求数据
+- `parent` 包含上一个请求结果
+- `request 包含本次请求参数
+- `result` 包含本次请求结果
 
 ## Koa
 
-Although this is a middleware for Express, you can still use it in Koa or other frameworks.
+虽然默认提供了 Express 中间件实现，但是仍旧能够在 Koa 或其他框架中使用，httproxy 暴露了一些底层方法用于自定义场景。
 
-## License
+### `httproxy.request()`
+### `httproxy.parse()`
+### `httproxy.setting()`
 
-Licensed under the MIT license.
+## 协议
+
+MIT
