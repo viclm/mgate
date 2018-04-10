@@ -119,9 +119,12 @@ exports.get = {
 
 虽然默认提供了 Express 中间件实现，但是仍旧能够在 Koa 或其他框架中使用，httproxy 暴露了一些底层方法用于自定义场景。
 
-### `httproxy.request()`
+### `httproxy.config`
+设置或获取全局配置参数
 ### `httproxy.parse()`
-### `httproxy.setting()`
+解析转发规则文件目录
+### `httproxy.request()`
+发起转发请求
 
 ## 协议
 
