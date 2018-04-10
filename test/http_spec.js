@@ -2,6 +2,7 @@ const test = require('ava')
 const sinon = require('sinon')
 const Busboy = require('busboy')
 const createServer = require('http').createServer
+const zlib = require('zlib')
 const http = require('../lib/http')
 
 const httpro = function (options, callback) {
@@ -198,6 +199,66 @@ test.serial('multipart/form-data', async t => {
       foo: 'bar'
     },
     datatype: 'form-data'
+  })
+
+})
+
+test.serial('json', async t => {
+  t.plan(5)
+
+  server.on('/api/1', (req, res) => {
+    res.setHeader('content-type', 'application/json')
+    res.write('{"foo": "bar"}')
+    res.end()
+  })
+
+  server.on('/api/2', (req, res) => {
+    res.write('{"foo": "bar"}')
+    res.end()
+  })
+
+  server.on('/api/3', (req, res) => {
+    res.setHeader('content-type', 'application/json')
+    res.write('{"foo": "bar}')
+    res.end()
+  })
+
+  await httpro({
+    url: `${server.url}/api/1`
+  }, (err, result) => {
+    t.is(err, null)
+    t.deepEqual(result, { foo: 'bar' })
+  })
+
+  await httpro({
+    url: `${server.url}/api/2`
+  }, (err, result) => {
+    t.is(err, null)
+    t.is(result, '{"foo": "bar"}')
+  })
+
+  await httpro({
+    url: `${server.url}/api/3`
+  }, (err, result) => {
+    t.true(err instanceof Error)
+  })
+
+})
+
+test.serial('gzip', async t => {
+  t.plan(2)
+
+  server.on('/api/1', (req, res) => {
+    res.setHeader('content-encoding', 'gzip')
+    res.write(zlib.gzipSync('ok'))
+    res.end()
+  })
+
+  await httpro({
+    url: `${server.url}/api/1`
+  }, (err, result) => {
+    t.is(err, null)
+    t.is(result, 'ok')
   })
 
 })
