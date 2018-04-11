@@ -4,6 +4,7 @@
 
 [![Build Status](https://travis-ci.org/viclm/httproxy.svg?branch=master)](https://travis-ci.org/viclm/httproxy)
 [![Coverage Status](https://coveralls.io/repos/github/viclm/httproxy/badge.svg?branch=master)](https://coveralls.io/github/viclm/httproxy?branch=master)
+[![npm package](https://img.shields.io/npm/v/httproxy.svg)](https://www.npmjs.org/package/httproxy)
 
 ## 特点
 
