@@ -14,6 +14,8 @@
 - 内置熔断恢复机制
 - 适配 Express 中间件，可独立使用
 
+> :heart_eyes_cat:即刻体验 https://postverta.com/app/httproxy
+
 ## 安装
 
 要求 Node.js 6.12.3 或更高版本
