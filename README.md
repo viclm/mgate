@@ -84,9 +84,13 @@ exports.get = {
 
 在规则定义模块中暴露同名属性来接收对应的 HTTP 方法类型。
 
-### `formdata`
+### `upload`
 
-处理客户端 `form-data` 类型的请求数据
+处理客户端 `form-data` 类型的请求数据，主要用于上传文件。设置为 `true` 开启无限制文件上传，可单独对文件数量、文件大小和文件类型进行限制。
+
+- `files` 文件数量
+- `filesize` 文件大小，支持 `5mb` 字符串模式
+- `filetype` 文件类型，使用数组指定多种类型
 
 ### `rules`
 
@@ -115,7 +119,7 @@ exports.get = {
 
 - `client` 包含原始客户端请求数据
 - `parent` 包含上一个请求结果
-- `request 包含本次请求参数
+- `request` 包含本次请求参数
 - `result` 包含本次请求结果
 
 ## Koa
