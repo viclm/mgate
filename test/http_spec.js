@@ -66,35 +66,26 @@ test.serial('node-style error-first callback API', async t => {
 
 })
 
-test.serial('GET is used default', async t => {
-  t.plan(1)
+test.serial('method', async t => {
+  t.plan(2)
 
   server.on('/api/1', (req, res) => {
     t.is(req.method, 'GET')
     res.end()
   })
 
-  await httpro({
-    url: `${server.url}/api/1`,
-  })
-
-})
-
-test.serial('POST uses application/x-www-form-urlencoded default', async t => {
-  t.plan(2)
-
-  server.on('/api/1', (req, res) => {
+  server.on('/api/2', (req, res) => {
     t.is(req.method, 'POST')
-    t.is(req.headers['content-type'], 'application/x-www-form-urlencoded')
     res.end()
   })
 
   await httpro({
     url: `${server.url}/api/1`,
-    method: 'post',
-    data: {
-      foo: 'bar'
-    }
+  })
+
+  await httpro({
+    url: `${server.url}/api/2`,
+    method: 'post'
   })
 
 })
@@ -151,11 +142,77 @@ test.serial('send data', async t => {
 
 })
 
-test.serial('application/json', async t => {
-  t.plan(2)
+test.serial('application/octet-stream', async t => {
+  t.plan(3)
 
   server.on('/api/1', (req, res) => {
     t.is(req.url, '/api/1')
+    t.is(req.headers['content-type'], 'application/octet-stream')
+    req.on('data', chunk => {
+      t.is(chunk.toString('hex'), 'abcdef')
+      res.end()
+    })
+  })
+
+  await httpro({
+    url: `${server.url}/api/1`,
+    method: 'post',
+    data: Buffer.from('abcdef', 'hex'),
+    datatype: 'raw'
+  })
+
+})
+
+test.serial('text/plain', async t => {
+  t.plan(3)
+
+  server.on('/api/1', (req, res) => {
+    t.is(req.url, '/api/1')
+    t.is(req.headers['content-type'], 'text/plain')
+    req.on('data', chunk => {
+      t.is(chunk.toString(), 'foo')
+      res.end()
+    })
+  })
+
+  await httpro({
+    url: `${server.url}/api/1`,
+    method: 'post',
+    data: 'foo',
+    datatype: 'text'
+  })
+
+})
+
+test.serial('application/x-www-form-urlencoded', async t => {
+  t.plan(3)
+
+  server.on('/api/1', (req, res) => {
+    t.is(req.url, '/api/1')
+    t.is(req.headers['content-type'], 'application/x-www-form-urlencoded')
+    req.on('data', chunk => {
+      t.is(chunk.toString(), 'foo=bar')
+      res.end()
+    })
+  })
+
+  await httpro({
+    url: `${server.url}/api/1`,
+    method: 'post',
+    data: {
+      foo: 'bar'
+    },
+    datatype: 'urlencoded'
+  })
+
+})
+
+test.serial('application/json', async t => {
+  t.plan(3)
+
+  server.on('/api/1', (req, res) => {
+    t.is(req.url, '/api/1')
+    t.is(req.headers['content-type'], 'application/json')
     req.on('data', chunk => {
       try {
         chunk = JSON.parse(chunk)
