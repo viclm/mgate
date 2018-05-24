@@ -39,7 +39,7 @@ test.afterEach.always(t => {
 })
 
 test.serial('node-style error-first callback API', async t => {
-  t.plan(4)
+  t.plan(3)
 
   server.on('/api/1', (req, res) => {
     res.end('ok')
@@ -61,7 +61,6 @@ test.serial('node-style error-first callback API', async t => {
     url: `${server.url}/api/2`
   }, (err, result) => {
     t.true(err instanceof Error)
-    t.is(result, undefined)
   })
 
 })
