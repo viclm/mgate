@@ -2,7 +2,7 @@ exports.post = {
   upload: {
     files: 1,
     filesize: '5mb',
-    filetype: ['png', 'jpg', 'gif']
+    filetype: /png/
   },
   rules: [
     {
