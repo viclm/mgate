@@ -1,55 +1,96 @@
 const test = require('ava')
 const sinon = require('sinon')
-const option = require('../lib/util/option')
+const wrap = require('../lib/util/option').wrap
 
-test('wrap a value/function/promise to a callback function', t => {
-  t.is(typeof option.wrap, 'function')
+test.cb('wrap a function to a callback-style function', t => {
+  t.plan(5)
 
-  const fn1 = option.wrap()
-  const cb1 = sinon.spy()
-  t.is(typeof fn1, 'function')
-  fn1(null, null, cb1)
-  t.true(cb1.calledOnce)
-  t.true(cb1.calledWith(null, null))
+  const func = function () { return 'ok' }
+  const spy = sinon.spy(func)
+  const wrapfunc = wrap(spy)
 
-  const fn2 = option.wrap()
-  const cb2 = sinon.spy()
-  t.is(typeof fn2, 'function')
-  fn2(null, 2, cb2)
-  t.true(cb2.calledOnce)
-  t.true(cb2.calledWith(null, 2))
+  t.is(typeof wrapfunc, 'function')
 
-  const fn3 = option.wrap(function () { return 3000 })
-  const cb3 = sinon.spy()
-  t.is(typeof fn3, 'function')
-  fn3(null, 3, cb3)
-  t.true(cb3.calledOnce)
-  t.true(cb3.calledWith(null, 3000))
+  wrapfunc(fn => {
+    fn((err, r) => {
+      t.ifError(err)
+      t.is(r, 'ok')
+      t.true(spy.calledOnce)
+    })
+  })
 
-  const fn4 = option.wrap(function () { throw 'error' })
-  const cb4 = sinon.spy()
-  t.is(typeof fn4, 'function')
-  fn4(null, 4, cb4)
-  t.true(cb4.calledOnce)
-  t.true(cb4.calledWith('error'))
+  const funcThrow = function () { throw new Error }
+  const spyThrow = sinon.spy(funcThrow)
+  const wrapfuncThrow = wrap(spyThrow)
 
-  const fn5 = option.wrap(function () { return Promise.resolve(5000) })
-  const cb5 = sinon.spy()
-  t.is(typeof fn5, 'function')
-  fn5(null, 5, cb5)
-  t.false(cb5.calledOnce)
-  setTimeout(() => {
-    t.true(cb5.calledOnce)
-    t.true(cb5.calledWith(null, 5000))
-  }, 0)
+  wrapfuncThrow(fn => {
+    fn((err, r) => {
+      t.true(err instanceof Error)
+      t.end()
+    })
+  })
+})
 
-  const fn6 = option.wrap(function () { return Promise.reject('error') })
-  const cb6 = sinon.spy()
-  t.is(typeof fn6, 'function')
-  fn6(null, 6, cb6)
-  t.false(cb6.calledOnce)
-  setTimeout(() => {
-    t.true(cb6.calledOnce)
-    t.true(cb6.calledWith('error'))
-  }, 0)
+test.cb('wrap a promise-return function to a callback-style function', t => {
+  t.plan(5)
+
+  const func = function () { return new Promise((resolve, reject) => { setTimeout(() => resolve('ok'), 0) }) }
+  const spy = sinon.spy(func)
+  const wrapfunc = wrap(spy)
+
+  t.is(typeof wrapfunc, 'function')
+
+  wrapfunc(fn => {
+    fn((err, r) => {
+      t.ifError(err)
+      t.is(r, 'ok')
+      t.true(spy.calledOnce)
+    })
+  })
+
+  const funcReject = function () { return new Promise((resolve, reject) => { setTimeout(() => reject(new Error), 100) }) }
+  const spyReject = sinon.spy(funcReject)
+  const wrapfuncReject = wrap(spyReject)
+
+  wrapfuncReject(fn => {
+    fn((err, r) => {
+      t.true(err instanceof Error)
+      t.end()
+    })
+  })
+})
+
+test.cb('prepend arguments to target function', t => {
+  t.plan(1)
+
+  const spy = sinon.spy()
+  const wrapfunc = wrap(spy)
+
+  wrapfunc(fn => {
+    fn((err, r) => {
+      t.true(spy.calledWith('a', 'b'))
+      t.end()
+    }, 'a', 'b')
+  })
+})
+
+test('second argument gets called when wrap a non-function object', t => {
+  t.plan(4)
+
+  const spy1 = sinon.spy()
+  const spy2 = sinon.spy()
+
+  wrap(function(){})(spy1, spy2)
+
+  t.true(spy1.calledOnce)
+  t.true(spy2.notCalled)
+
+
+  const spy3 = sinon.spy()
+  const spy4 = sinon.spy()
+
+  wrap()(spy3, spy4)
+
+  t.true(spy3.notCalled)
+  t.true(spy4.calledOnce)
 })

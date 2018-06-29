@@ -1,6 +1,6 @@
 {
   "scripts": {
-    "start": "nodemon --watch ../lib app.js"
+    "start": "nodemon --watch ../lib --watch api app.js"
   },
   "dependencies": {
     "express": "^4.16.2",

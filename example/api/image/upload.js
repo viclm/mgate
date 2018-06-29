@@ -1,18 +1,16 @@
 exports.post = {
-  upload: {
-    files: 1,
-    filesize: '5mb',
-    filetype: /png/
-  },
-  rules: [
-    {
-      url: 'https://pasteboard.co/upload',
-      method: 'post',
-      datatype: 'form-data',
-      timeout: 1000,
-      after(context) {
-        return 'https://cdn.pbrd.co/images/' + context.result.url.match(/[^/]+$/)[0]
+  image: {
+    url: 'https://pasteboard.co/upload',
+    method: 'post',
+    datatype: 'form-data',
+    timeout: 1000,
+    before(context) {
+      return {
+        data: context.$client
       }
+    },
+    after(context, defaults) {
+      return 'https://cdn.pbrd.co/images/' + defaults.url.match(/[^/]+$/)[0]
     }
-  ]
+  }
 }
