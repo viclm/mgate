@@ -3,7 +3,6 @@ exports.post = {
     url: 'https://pasteboard.co/upload',
     method: 'post',
     datatype: 'form-data',
-    timeout: 1000,
     before(context) {
       return {
         data: context.$client
