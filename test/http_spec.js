@@ -65,6 +65,29 @@ test.serial('node-style error-first callback API', async t => {
 
 })
 
+test.serial('timeout', async t => {
+  t.plan(3)
+
+  server.on('/api/1', (req, res) => {
+    setTimeout(() => res.end('ok'), 50)
+  })
+
+  await httpro({
+    url: `${server.url}/api/1`,
+    timeout: 30
+  }, (err, result) => {
+    t.true(err instanceof Error)
+  })
+
+  await httpro({
+    url: `${server.url}/api/1`,
+    timeout: 70
+  }, (err, result) => {
+    t.is(err, null)
+    t.is(result, 'ok')
+  })
+})
+
 test.serial('method', async t => {
   t.plan(2)
 
@@ -301,12 +324,38 @@ test.serial('json', async t => {
 
 })
 
+test.serial('unvalid datatype', async t => {
+  t.plan(1)
+
+  server.on('/api/1', (req, res) => {
+    res.end('ok')
+  })
+
+  await httpro({
+    url: `${server.url}/api/1`,
+    method: 'post',
+    data: {
+      foo: 'bar'
+    },
+    datatype: 'xxx'
+  }, (err, result) => {
+    t.true(err instanceof Error)
+  })
+
+})
+
 test.serial('gzip', async t => {
-  t.plan(2)
+  t.plan(3)
 
   server.on('/api/1', (req, res) => {
     res.setHeader('content-encoding', 'gzip')
     res.write(zlib.gzipSync('ok'))
+    res.end()
+  })
+
+  server.on('/api/2', (req, res) => {
+    res.setHeader('content-encoding', 'gzip')
+    res.write('ok')
     res.end()
   })
 
@@ -317,4 +366,45 @@ test.serial('gzip', async t => {
     t.is(result, 'ok')
   })
 
+  await httpro({
+    url: `${server.url}/api/2`
+  }, (err, result) => {
+    t.true(err instanceof Error)
+  })
+
+})
+
+test.serial('https', async t => {
+  t.plan(2)
+
+  const NODE_TLS_REJECT_UNAUTHORIZED = process.env.NODE_TLS_REJECT_UNAUTHORIZED
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
+
+  const server = require('https').createServer({
+    key: require('fs').readFileSync(__dirname + '/helper/key.pem'),
+    cert: require('fs').readFileSync(__dirname + '/helper/cert.pem')
+  }, (req, res) => {
+    res.end('ok')
+  })
+
+  await new Promise((resolve, reject) => {
+    server.listen(0, 'localhost', (err) => {
+      if (err) {
+        reject(err)
+      }
+      else {
+        resolve()
+      }
+    })
+  })
+
+  await httpro({
+    url: `https://localhost:${server.address().port}/api/i`
+  }, (err, result) => {
+    t.is(err, null)
+    t.is(result, 'ok')
+  })
+
+  server.close()
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = NODE_TLS_REJECT_UNAUTHORIZED
 })

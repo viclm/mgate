@@ -42,22 +42,7 @@ test('proxy single request', async t => {
   t.is(error.status, 404)
 })
 
-test('merge multiple serial request', async t => {
-  t.plan(1)
-
-  await proxy({}, {
-    x1:{
-      url: `${remote}/api/x1`,
-      method: 'get',
-    },
-    x2:{
-      url: `${remote}/api/x2`,
-      method: 'get',
-    }
-  }).then(result => t.deepEqual(result, { x1: '[GET]x1', x2: '[GET]x2' }))
-})
-
-test('use when function to skip a request', async t => {
+test('use when function to switch a request', async t => {
   t.plan(4)
 
   await proxy({}, {
@@ -156,9 +141,120 @@ test('use fallback function to output defaults when a request broken', async t =
     xxx:{
       url: `${remote}/error_api/xxx`,
       method: 'get',
-      fake() {
+      fallback() {
         return '[FALLBACK]fff'
       }
     }
   }).then(result => t.deepEqual(result, { xxx: '[FALLBACK]fff' }))
+})
+
+test('merge multiple undependent request', async t => {
+  t.plan(1)
+
+  await proxy({}, {
+    x1:{
+      url: `${remote}/api/x1`,
+      method: 'get',
+    },
+    x2:{
+      url: `${remote}/api/x2`,
+      method: 'get',
+    }
+  }).then(result => t.deepEqual(result, { x1: '[GET]x1', x2: '[GET]x2' }))
+})
+
+test('merge multiple dependent request', async t => {
+  t.plan(2)
+
+  await proxy({}, {
+    x1:{
+      url: `${remote}/api/x1`,
+      method: 'get',
+    },
+    x2:{
+      url: `${remote}/api/x2`,
+      method: 'get',
+      when(context) {
+        return !context.x1
+      }
+    },
+    x3:{
+      url: `${remote}/api/x3`,
+      method: 'get',
+      when(context) {
+        return context.x1
+      }
+    }
+  }).then(result => t.deepEqual(result, { x1: '[GET]x1', x3: '[GET]x3' }))
+
+  await t.throws(proxy({}, {
+    x1:{
+      url: `${remote}/api/x1`,
+      method: 'get',
+      when(context) {
+        return context.xxx
+      }
+    },
+  }))
+})
+
+test('max dependent path is 3 default', async t => {
+  t.plan(2)
+
+  await t.throws(proxy({}, {
+    x1:{
+      url: `${remote}/api/x1`,
+      method: 'get',
+    },
+    x2:{
+      url: `${remote}/api/x2`,
+      method: 'get',
+      when(context) {
+        return context.x1
+      }
+    },
+    x3:{
+      url: `${remote}/api/x3`,
+      method: 'get',
+      when(context) {
+        return context.x2
+      }
+    },
+    x4:{
+      url: `${remote}/api/x4`,
+      method: 'get',
+      when(context) {
+        return context.x3
+      }
+    }
+  }))
+
+  await t.throws(proxy({}, {
+    x1:{
+      url: `${remote}/api/x1`,
+      method: 'get',
+      when(context) {
+        return context.x1
+      }
+    },
+  }))
+
+})
+
+test('private key is not contained in the final response', async t => {
+  t.plan(1)
+
+  await proxy({}, {
+    '#x1':{
+      url: `${remote}/api/x1`,
+      method: 'get',
+    },
+    x2:{
+      url: `${remote}/api/x2`,
+      method: 'get',
+      when(context) {
+        return context.x1
+      }
+    }
+  }).then(result => t.deepEqual(result, { x2: '[GET]x2' }))
 })

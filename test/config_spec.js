@@ -10,4 +10,6 @@ test.serial('set all configs once', t => {
 
   t.is(config.get('circuitbreaker'), true)
   t.is(config.get('xxx'), 'xxx')
+  t.is(config.circuitbreaker, true)
+  t.is(config.xxx, 'xxx')
 })
