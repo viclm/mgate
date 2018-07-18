@@ -8,7 +8,7 @@ exports.get = {
     url: 'https://api.dongqiudi.com/app/tabs/iphone/x.json',
     before(context, defaults) {
       const repeats = []
-      for (let i = 0 ; i < context.pages ; i++) {
+      for (let i = 1 ; i < context.pages + 1 ; i++) {
         repeats.push({ url: defaults.url.replace(/x(?=\.json$)/, i) })
       }
       return repeats
