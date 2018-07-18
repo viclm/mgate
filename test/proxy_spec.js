@@ -97,22 +97,8 @@ test('use when function to skip a request', async t => {
   }))
 })
 
-test('use repeat function to repeat a repeat base on a iterator collection', async t => {
-  t.plan(1)
-
-  await proxy({}, {
-    xxx:{
-      url: `${remote}/api/xxx`,
-      method: 'get',
-      repeat() {
-        return [1, 2]
-      }
-    }
-  }).then(result => t.deepEqual(result, { xxx: ['[GET]xxx', '[GET]xxx'] }))
-})
-
 test('use before function to change the request options', async t => {
-  t.plan(1)
+  t.plan(2)
 
   await proxy({}, {
     xxx:{
@@ -123,6 +109,16 @@ test('use before function to change the request options', async t => {
       }
     }
   }).then(result => t.deepEqual(result, { xxx: '[POST]xxx' }))
+
+  await proxy({}, {
+    xxx:{
+      url: `${remote}/api/xxx`,
+      method: 'get',
+      before(context, defaults) {
+        return [defaults, defaults]
+      }
+    }
+  }).then(result => t.deepEqual(result, { xxx: ['[GET]xxx', '[GET]xxx'] }))
 })
 
 test('use after function to change the result', async t => {

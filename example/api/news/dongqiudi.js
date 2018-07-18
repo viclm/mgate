@@ -7,17 +7,17 @@ exports.get = {
   topnews: {
     url: 'https://api.dongqiudi.com/app/tabs/iphone/x.json',
     before(context, defaults) {
-      return {
-        url: defaults.url.replace(/x(?=\.json$)/, context.$iterator)
+      const repeats = []
+      for (let i = 0 ; i < context.pages ; i++) {
+        repeats.push({ url: defaults.url.replace(/x(?=\.json$)/, i) })
       }
+      return repeats
     },
     after(context, defaults) {
-      return defaults.articles
+      return defaults
+        .reduce((arr, item) => arr.concat(item.articles), [])
         .filter(article => !article.collection_type && !article.is_redirect_h5 && article.template === 'news.html')
         .map(article => article.title)
-    },
-    repeat(context) {
-      return Array(context.pages + 1).join(0).split('').map((_, i) => ++i)
     }
   }
 }

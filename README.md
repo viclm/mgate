@@ -167,7 +167,6 @@ app.listen(4869)
 | `datatype` | 请求数据类型，目前支持 form-data 和 json 两种 |
 | `timeout`  | 设置请求延时 |
 | `when`     | 判断是否可跳过该次请求 |
-| `repeat`   | 循环执行请求 |
 | `before`   | 在请求之前修改请求参数 |
 | `after`    | 修改请求结果 |
 | `fallback` | 当请求不可用时提供降级数据 |
