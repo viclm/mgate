@@ -86,9 +86,16 @@ exports.get = {
 yarn add httproxy
 ```
 
-## 作为 Express 中间件使用
+## 快速搭建一个转发服务器
 
-### app.js
+```javascript
+const httproxy = require('httproxy')
+httproxy.serve(4869, {
+  rules: 'api' // 指定转发规则文件夹
+})
+```
+
+## 手动发起一次转发请求
 
 ```javascript
 const express = require('express')
@@ -96,26 +103,61 @@ const httproxy = require('httproxy')
 
 const app = express()
 
-app.use(httproxy({ api: 'api'}))
+app.get('/news', (req, res, next) => {
+  httproxy.proxy({
+    list: {
+      url: 'https://soccer.hupu.com/home/latest-news',
+      before(context) {
+        return {
+          data: {
+            league: '意甲',
+            page: 1
+          }
+        }
+      },
+      after(context, defaults) {
+        return defaults.result
+          .map(article => article.title)
+      }
+    }
+  }).then(result => res.json(result), next)
+})
 
 app.listen(4869)
 ```
 
-## 全局配置
 
-### `api`
+## API
 
-该目录下包含了所有的转发规则文件，目录名也用于请求路径前缀。
+### `httproxy.config(options)`
 
-### `maxdepends`
+全局配置
 
+#### `rules`
+规则定义列表，可指定包含规则文件定义的文件夹路径，会自动解析成规则列表。
+
+#### `maxdepends`
 资源的依赖深度，默认值为 2 表示 A => B => C => D 是不被允许的。
 
-### `skipnull`
-
+#### `skipnull`
 是否允许某个资源为空，即最终的响应是否能够包含值为空的字段，默认不包含。
 
-### `upload`
+#### `circuitbreaker`
+熔断机制开关，目前尚处在试验阶段，默认为 `false` 关闭。直接设置为 `true` 使用默认配置开启熔断，可使用对象字面量进行详细配置。
+
+### `httproxy.proxy(graph, requestdata = {})`
+
+发起一次转发请求，传入转发规则和初始数据。
+
+### `httproxy.request(path, method, requestdata = {})`
+
+发起一次转发请求，传入目标路径、方法和初始数据，此方法要求 `httproxy.config` 提前张载规则列表。
+
+### `httproxy.serve(port, [options])`
+
+快速启动一个转发服务器，接收所有 `httproxy.config` 参数和以下额外的参数。
+
+#### `upload`
 
 开启文件上传支持，文件会临时存在内存里，谨慎使用，默认为 `false`。
 
@@ -130,23 +172,9 @@ app.listen(4869)
 }
 ```
 
-### `circuitbreaker`
-
-熔断机制开关，目前尚处在试验阶段，默认为 `false` 关闭。
-
-直接设置为 `true` 使用默认配置开启熔断，可使用对象字面量进行详细配置。
-
-```
-{
-  duration
-}
-```
-
-### `response`
+#### `response`
 
 自定义响应包裹层函数，主要用于传递接口状态和错误信息。
-
-默认值：
 
 ```
 (err, data) => {
@@ -164,7 +192,7 @@ app.listen(4869)
 |:-----------|:-|
 | `url`      | 请求路径 |
 | `method`   | 请求方法 |
-| `datatype` | 请求数据类型，目前支持 form-data 和 json 两种 |
+| `datatype` | 请求数据类型，目前支持 urlencoded、json 和 form-data |
 | `timeout`  | 设置请求延时 |
 | `when`     | 判断是否可跳过该次请求 |
 | `before`   | 在请求之前修改请求参数 |
