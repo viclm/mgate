@@ -1,9 +1,6 @@
-const express = require('express')
 const httproxy = require('../')
 
-const app = express()
-
-const proxy = httproxy({
+const server = httproxy.serve(4869, {
   upload: {
     route: /upload/,
     files: 1,
@@ -12,18 +9,14 @@ const proxy = httproxy({
   }
 })
 
-proxy.on('http request', (res) => {
-  console.log('[HTTP REQUEST LOG]', res.timing.stop)
+server.on('info', message => {
+  console.log(`[INFO]message=${message}`)
 })
 
-proxy.on('http error', (err) => {
-  console.log('[HTTP ERROR LOG]', err.message)
+server.on('error', error => {
+  console.log(`[ERROR]code=${error.code}||message=${error.message}`)
 })
 
-proxy.on('error', (err) => {
-  console.log('[ERROR LOG]', err.message)
+server.on('http', ({ error, response, request }) => {
+  console.log(`[HTTP]url=${request.url}||method=${request.method}||time=${response.timing.stop}`)
 })
-
-app.use(proxy)
-
-app.listen(4869)
