@@ -18,5 +18,12 @@ server.on('error', error => {
 })
 
 server.on('http', ({ error, response, request }) => {
-  console.log(`[HTTP]url=${request.url}||method=${request.method}||time=${response.timing.stop}`)
+  let message = `[HTTP]url=${request.url}||method=${request.method}`
+  if (error) {
+    message += `||error=${error.message}`
+  }
+  else {
+    message += `||duration=${new Date(response.timing.stop) - new Date(response.timing.start)}`
+  }
+  console.log(message)
 })

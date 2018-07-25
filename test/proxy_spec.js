@@ -198,7 +198,7 @@ test('merge multiple dependent request', async t => {
   }))
 })
 
-test('max dependent path is 3 default', async t => {
+test('max dependent path is 2 default', async t => {
   t.plan(2)
 
   await t.throws(proxy({}, {
