@@ -3,6 +3,7 @@ exports.post = {
     url: 'https://pasteboard.co/upload',
     method: 'post',
     datatype: 'form-data',
+    timeout: 3000,
     before(context) {
       return {
         data: context.$client
@@ -10,6 +11,9 @@ exports.post = {
     },
     after(context, defaults) {
       return 'https://cdn.pbrd.co/images/' + defaults.url.match(/[^/]+$/)[0]
+    },
+    fallback() {
+      return ''
     }
   }
 }
