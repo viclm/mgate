@@ -1,6 +1,7 @@
 const httproxy = require('../')
 
-const server = httproxy.serve(4869, {
+const server = httproxy.createServer({
+  rules: 'api',
   upload: {
     route: /upload/,
     files: 1,
@@ -9,21 +10,22 @@ const server = httproxy.serve(4869, {
   }
 })
 
-server.on('info', message => {
-  console.log(`[INFO]message=${message}`)
-})
-
 server.on('error', error => {
   console.log(`[ERROR]code=${error.code}||message=${error.message}`)
 })
 
-server.on('http', ({ error, response, request }) => {
-  let message = `[HTTP]url=${request.url}||method=${request.method}`
-  if (error) {
-    message += `||error=${error.message}`
-  }
-  else {
-    message += `||duration=${new Date(response.timing.stop) - new Date(response.timing.start)}`
-  }
-  console.log(message)
+server.on('request', requests => {
+  requests.forEach(r => {
+    const { request, response, error } = r
+    let message = `[HTTP]url=${request.url}||method=${request.method}`
+    if (error) {
+      message += `||error=${error.message}`
+    }
+    else {
+      message += `||duration=${new Date(response.timing.stop) - new Date(response.timing.start)}`
+    }
+    console.log(message)
+  })
 })
+
+server.start()

@@ -6,7 +6,7 @@ exports.post = {
     timeout: 3000,
     before(context) {
       return {
-        data: context.$client
+        data: context.$init
       }
     },
     after(context, defaults) {

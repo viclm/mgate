@@ -7,7 +7,7 @@ exports.get = {
       return {
         data: {
           query: `query {
-            getLocation(ip: "${context.$client.ip}") {
+            getLocation(ip: "${context.$init.ip}") {
               city {
                 names {
                   en
@@ -31,7 +31,7 @@ exports.post = {
     datatype: 'json',
     before(context) {
       return {
-        data: context.$client
+        data: context.$init
       }
     },
     after(context, defaults) {
