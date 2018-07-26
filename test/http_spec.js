@@ -74,14 +74,14 @@ test.serial('timeout', async t => {
 
   await httpro({
     url: `${server.url}/api/1`,
-    timeout: 30
+    timeout: 10
   }, (err, result) => {
     t.true(err instanceof Error)
   })
 
   await httpro({
     url: `${server.url}/api/1`,
-    timeout: 70
+    timeout: 90
   }, (err, result) => {
     t.is(err, null)
     t.is(result, 'ok')

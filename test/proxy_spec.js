@@ -25,14 +25,14 @@ test.after.always(t => {
 test('proxy single request', async t => {
   t.plan(3)
 
-  await proxy({}, {
+  await proxy({
     xxx: {
       url: `${remote}/api/xxx`,
       method: 'get',
     }
   }).then(result => t.deepEqual(result, { xxx: '[GET]xxx' }))
 
-  const error = await t.throws(proxy({}, {
+  const error = await t.throws(proxy({
     xxx: {
       url: `${remote}/error_api/xxx`,
       method: 'get',
@@ -45,7 +45,7 @@ test('proxy single request', async t => {
 test('use when function to switch a request', async t => {
   t.plan(4)
 
-  await proxy({}, {
+  await proxy({
     x1:{
       url: `${remote}/api/x1`,
       method: 'get',
@@ -61,7 +61,7 @@ test('use when function to switch a request', async t => {
     t.notDeepEqual(result, { x1: '[GET]x1', x2: '[GET]x2' })
   })
 
-  await t.throws(proxy({}, {
+  await t.throws(proxy({
     xxx: {
       url: `${remote}/api/xxx`,
       method: 'get',
@@ -71,7 +71,7 @@ test('use when function to switch a request', async t => {
     }
   }))
 
-  await t.throws(proxy({}, {
+  await t.throws(proxy({
     xxx: {
       url: `${remote}/api/xxx`,
       method: 'get',
@@ -85,7 +85,7 @@ test('use when function to switch a request', async t => {
 test('use before function to change the request options', async t => {
   t.plan(2)
 
-  await proxy({}, {
+  await proxy({
     xxx:{
       url: `${remote}/api/xxx`,
       method: 'get',
@@ -95,7 +95,7 @@ test('use before function to change the request options', async t => {
     }
   }).then(result => t.deepEqual(result, { xxx: '[POST]xxx' }))
 
-  await proxy({}, {
+  await proxy({
     xxx:{
       url: `${remote}/api/xxx`,
       method: 'get',
@@ -109,7 +109,7 @@ test('use before function to change the request options', async t => {
 test('use after function to change the result', async t => {
   t.plan(1)
 
-  await proxy({}, {
+  await proxy({
     xxx:{
       url: `${remote}/api/xxx`,
       method: 'get',
@@ -123,7 +123,7 @@ test('use after function to change the result', async t => {
 test('use fake function to custom a request completely', async t => {
   t.plan(1)
 
-  await proxy({}, {
+  await proxy({
     xxx:{
       url: `${remote}/api/xxx`,
       method: 'get',
@@ -137,7 +137,7 @@ test('use fake function to custom a request completely', async t => {
 test('use fallback function to output defaults when a request broken', async t => {
   t.plan(1)
 
-  await proxy({}, {
+  await proxy({
     xxx:{
       url: `${remote}/error_api/xxx`,
       method: 'get',
@@ -151,7 +151,7 @@ test('use fallback function to output defaults when a request broken', async t =
 test('merge multiple undependent request', async t => {
   t.plan(1)
 
-  await proxy({}, {
+  await proxy({
     x1:{
       url: `${remote}/api/x1`,
       method: 'get',
@@ -166,7 +166,7 @@ test('merge multiple undependent request', async t => {
 test('merge multiple dependent request', async t => {
   t.plan(2)
 
-  await proxy({}, {
+  await proxy({
     x1:{
       url: `${remote}/api/x1`,
       method: 'get',
@@ -187,7 +187,7 @@ test('merge multiple dependent request', async t => {
     }
   }).then(result => t.deepEqual(result, { x1: '[GET]x1', x3: '[GET]x3' }))
 
-  await t.throws(proxy({}, {
+  await t.throws(proxy({
     x1:{
       url: `${remote}/api/x1`,
       method: 'get',
@@ -198,10 +198,28 @@ test('merge multiple dependent request', async t => {
   }))
 })
 
-test('max dependent path is 2 default', async t => {
+test('private key is not contained in the final response', async t => {
+  t.plan(1)
+
+  await proxy({
+    '#x1':{
+      url: `${remote}/api/x1`,
+      method: 'get',
+    },
+    x2:{
+      url: `${remote}/api/x2`,
+      method: 'get',
+      when(context) {
+        return context.x1
+      }
+    }
+  }).then(result => t.deepEqual(result, { x2: '[GET]x2' }))
+})
+
+test('maxdepends option', async t => {
   t.plan(2)
 
-  await t.throws(proxy({}, {
+  await t.throws(proxy({
     x1:{
       url: `${remote}/api/x1`,
       method: 'get',
@@ -220,16 +238,9 @@ test('max dependent path is 2 default', async t => {
         return context.x2
       }
     },
-    x4:{
-      url: `${remote}/api/x4`,
-      method: 'get',
-      when(context) {
-        return context.x3
-      }
-    }
-  }))
+  }, { maxdepends: 1 }))
 
-  await t.throws(proxy({}, {
+  await t.throws(proxy({
     x1:{
       url: `${remote}/api/x1`,
       method: 'get',
@@ -241,20 +252,71 @@ test('max dependent path is 2 default', async t => {
 
 })
 
-test('private key is not contained in the final response', async t => {
-  t.plan(1)
+test('skipnull option', async t => {
+  t.plan(2)
 
-  await proxy({}, {
-    '#x1':{
-      url: `${remote}/api/x1`,
-      method: 'get',
-    },
-    x2:{
-      url: `${remote}/api/x2`,
-      method: 'get',
-      when(context) {
-        return context.x1
-      }
+  await proxy({
+    xxx: {
+      fake: () => null
     }
-  }).then(result => t.deepEqual(result, { x2: '[GET]x2' }))
+  }, { skipnull: false }).then(result => {
+    t.deepEqual(result, { xxx: null })
+  })
+
+  await proxy({
+    xxx: {
+      fake: () => null
+    }
+  }).then(result => {
+    t.deepEqual(result, {})
+  })
+})
+
+test('onstat option', async t => {
+  t.plan(10)
+
+  await proxy({
+    xxx: {
+      url: `${remote}/api/xxx`,
+      method: 'get',
+    }
+  }, {
+    onstat(requests) {
+      t.is(requests.length, 1)
+      t.is(requests[0].request.url, `${remote}/api/xxx`)
+      t.is(requests[0].response.status.code, 200)
+      t.falsy(requests[0].error)
+    }
+  })
+
+  await t.throws(proxy({
+    xxx: {
+      url: `${remote}/error_api/xxx`,
+      method: 'get',
+    }
+  }, {
+    onstat(requests) {
+      t.is(requests.length, 1)
+      t.is(requests[0].request.url, `${remote}/error_api/xxx`)
+      t.is(requests[0].response.status.code, 404)
+      t.true(requests[0].error instanceof Error)
+    }
+  }))
+
+  await proxy({
+    xxx: {
+      url: `${remote}/api/xxx`,
+      method: 'get',
+      before(context, defaults) {
+        return [
+          defaults, defaults, defaults
+        ]
+      },
+    }
+  }, {
+    onstat(requests) {
+      t.is(requests.length, 3)
+    }
+  })
+
 })
