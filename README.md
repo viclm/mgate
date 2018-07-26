@@ -151,7 +151,7 @@ server.start()
     </td>
   </tr>
   <tr>
-    <td><code>response</code></td>
+    <td><code>upload</code></td>
     <td>开启文件上传支持，文件会临时存在内存里，谨慎使用。</td>
     <td>
 <pre><code>

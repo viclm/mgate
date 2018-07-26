@@ -1,30 +1,35 @@
 # 示例
 
-## app.js
+启动一个转发网关服务器。
 
-全局设置和事件监听。
+## 支持的接口
 
-## api/index.js
+### GET `/api/news/*`
 
-响应 `/api/*`
+### GET `/api/news/hupu`
 
-支持任何请求类型，统一返回空对象 `{}`。
+### GET `/api/news/dongqiudi`
 
-## api/news
+### GET `/api/ip/location`
 
-响应 `/api/news/*`、`/api/news/hupu`、`/api/news/dongqiudi`。
+```
+ip=123.125.115.110
+```
 
-演示了大部分的请求选项，包括请求开关、请求前参数动态调整、请求后结果二次处理和自定义请求行为。
-同时还涉及到私有键值、资源依赖、迭代请求等高级功能。
+### POST `/api/ip/location`
 
-## api/cinema
+`application/json`
 
-响应 `/api/news/*`。
+```
+{
+  "query": "query { getLocation(ip: \"23.92.23.30\") { city { names { en } } } }"
+}
+```
 
-涉及到 `application/json` 请求类型和自动降级功能。
+### POST `/api/image/upload`
 
-## api/image
+`form-data`
 
-响应 `/api/news/*`。
-
-涉及到 `form-data` 请求类型和文件上传。
+```
+file=<file>
+```
