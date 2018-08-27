@@ -1,5 +1,5 @@
-const debug = require('debug')('httproxy:circuitbreaker')
-const timer = require('./util/timer')
+const debug = require('debug')('mgate:circuitbreaker')
+const timer = require('./utils/timer')
 
 const STATUS_OPEN = 'open'
 const STATUS_HARFOPEN = 'harfopen'

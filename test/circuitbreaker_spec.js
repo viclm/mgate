@@ -1,6 +1,6 @@
 const test = require('ava')
 const sinon = require('sinon')
-const circuitbreaker = require('../lib/circuitbreaker')
+const circuitbreaker = require('../circuitbreaker')
 
 const uri = 'http://upstream.com/gateway/resource#post'
 

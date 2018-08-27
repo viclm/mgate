@@ -1,6 +1,6 @@
-const httproxy = require('../')
+const mgate = require('../')
 
-const server = httproxy.createServer({
+const server = mgate({
   rules: 'api',
   upload: {
     route: /upload/,

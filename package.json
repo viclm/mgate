@@ -1,12 +1,11 @@
 {
-  "name": "httproxy",
-  "description": "A HTTP proxy for RESTful composition",
-  "version": "0.3.3",
+  "name": "mgate",
+  "description": "Lightweight gateway written in Node",
+  "version": "0.0.1-alpha",
   "engines": {
-    "node": ">=6.12.3"
+    "node": ">=7.10.1"
   },
-  "main": "lib/index.js",
-  "repository": "viclm/httproxy",
+  "repository": "viclm/mgate",
   "license": "MIT",
   "scripts": {
     "test": "ava test --verbose",
@@ -19,7 +18,7 @@
           "env",
           {
             "targets": {
-              "node": "6.12.3"
+              "node": "7.10.1"
             }
           }
         ]

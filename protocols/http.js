@@ -4,11 +4,13 @@ const zlib = require('zlib')
 const url = require('url')
 const querystring = require('querystring')
 const FormData = require('form-data')
-const debug = require('debug')('httproxy:http')
+const debug = require('debug')('mgate:http')
+const circuitbreaker = require('../circuitbreaker')
 
 const rhttp = /^https?:\/\//
 const rjson = /^application\/json\b/
 const rformdata = /^multipart\/form-data\b/
+const rtrimqs = /(?:\?.*)?$/
 
 class HTTPError extends Error {
   constructor(message, status = 500) {
@@ -17,7 +19,7 @@ class HTTPError extends Error {
   }
 }
 
-module.exports = function http(options, callback) {
+exports.http = function http(options, callback) {
 
   let urls = url.parse(options.url)
   let timeout = options.timeout
@@ -206,4 +208,40 @@ module.exports = function http(options, callback) {
 
   return req
 
+}
+
+exports.fetch = function fetch(options) {
+  if (!options.url) {
+    return Promise.resolve([null, new Error('http url is required')])
+  }
+  if (!options.method) {
+    options.method = 'get'
+  }
+
+  const url = options.url.replace(rtrimqs, '')
+  const method = options.method.toLowerCase()
+  const uri = `[${method}]${url}`
+
+  const cbr = new Proxy(circuitbreaker, {
+    get(target, name) {
+      return options.circuitbreaker ? target[name] : () => {}
+    }
+  })
+
+  if (cbr.check(uri)) {
+    return Promise.resolve([null, new Error(`circuit break for ${method} ${url}`)])
+  }
+
+  return new Promise((resolve, reject) => {
+    exports.http(options, (err, data, res, req) => {
+      if (err) {
+        cbr.monitor(uri)
+        cbr.record(uri, false)
+      }
+      else {
+        cbr.record(uri, true)
+      }
+      resolve({ err, data, res, req })
+    })
+  })
 }

@@ -3,7 +3,7 @@ const sinon = require('sinon')
 const Busboy = require('busboy')
 const createServer = require('http').createServer
 const zlib = require('zlib')
-const http = require('../lib/http')
+const http = require('../protocols/http').http
 
 const httpro = function (options, callback) {
   return new Promise((resolve, reject) => {
