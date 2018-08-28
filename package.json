@@ -36,7 +36,6 @@
     "babel-preset-env": "^1.6.1",
     "coveralls": "^3.0.0",
     "nyc": "^11.6.0",
-    "pify": "^3.0.0",
     "sinon": "^4.4.9"
   }
 }

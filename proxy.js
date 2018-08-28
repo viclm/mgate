@@ -4,7 +4,7 @@ const http = require('./protocols/http')
 
 class UnresolvedDependencyError extends Error {}
 
-exports.proxy = function proxy(graph, options, callback) {
+exports.proxy = async function proxy(graph, options) {
   debug('proxy start')
   debug('graph %o', graph)
 
@@ -59,7 +59,7 @@ exports.proxy = function proxy(graph, options, callback) {
 
     const service = services[serviceName]
     if (!service) {
-      throw Promise.reject(new Error(`service ${serviceName} isn't registered`))
+      throw new Error(`service ${serviceName} isn't registered`)
     }
 
     if (service.protocol === 'http' || service.protocol === 'https') {
@@ -78,8 +78,25 @@ exports.proxy = function proxy(graph, options, callback) {
       }
       return result.data
     }
+    else if (service.protocol === 'http2') {
+      const http2 = require('./protocols/http2')
+      serviceOptions.circuitbreaker = circuitbreaker
+      serviceOptions.url = service.address + serviceOptions.path
+      delete serviceOptions.service
+      delete serviceOptions.path
+      const result = await http2.fetch(serviceOptions)
+      fetchStat.push({
+        error: result.err,
+        response: result.res,
+        request: result.req
+      })
+      if (result.err) {
+        throw result.err
+      }
+      return result.data
+    }
 
-    throw Promise.reject(new Error(`${service.protocol} protocol isn't supported`))
+    throw new Error(`${service.protocol} protocol isn't supported`)
   }
 
   async function resolveField(fieldKey, fieldBody) {
@@ -103,7 +120,7 @@ exports.proxy = function proxy(graph, options, callback) {
         [result, err] = await func.multiple(fetchService, fetchOptions.service, fetchOptions)
       }
       else {
-        [result, err] = await func.multiple(Promise.all, fetchOptions.map(o => fetchService(o.service, o)))
+        [result, err] = await func.multiple(Promise.all.bind(Promise), fetchOptions.map(o => fetchService(o.service, o)))
       }
 
       if (err) {
@@ -152,23 +169,17 @@ exports.proxy = function proxy(graph, options, callback) {
     await resolve(resolvedGraph)
   }
 
-  resolve(resolvedGraph)
-  .then(() => {
-    const output = {}
-    for (const key in resolvedGraph) {
-      const field = resolvedGraph[key]
-      if (field.public && (!skipnull || field.resolved !== null)) {
-        output[key] = field.resolved
-      }
+  await resolve(resolvedGraph)
+
+  if (onstat) {
+    onstat.call(null, fetchStat)
+  }
+  const output = {}
+  for (const key in resolvedGraph) {
+    const field = resolvedGraph[key]
+    if (field.public && (!skipnull || field.resolved !== null)) {
+      output[key] = field.resolved
     }
-    callback(null, output)
-  })
-  .catch(err => {
-    callback(err)
-  })
-  .then(() => {
-    if (onstat) {
-      onstat.call(null, fetchStat)
-    }
-  })
+  }
+  return output
 }

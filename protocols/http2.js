@@ -1,5 +1,4 @@
-const httpRequest = require('http').request
-const httpsRequest = require('https').request
+const http2 = require('http2')
 const zlib = require('zlib')
 const url = require('url')
 const querystring = require('querystring')
@@ -19,7 +18,7 @@ class HTTPError extends Error {
   }
 }
 
-exports.http = function http(options, callback) {
+exports.http2 = function h2(options, callback) {
 
   let urls = url.parse(options.url)
   let timeout = options.timeout
@@ -102,8 +101,7 @@ exports.http = function http(options, callback) {
     }
   }
 
-  let req
-  let reqOptions = {
+  const reqOptions = {
     host: urls.hostname,
     port: urls.port,
     path: urls.path,
@@ -113,12 +111,15 @@ exports.http = function http(options, callback) {
 
   debug('http request %O', reqOptions)
 
-  if (urls.protocol === 'https:') {
-    req = httpsRequest(reqOptions)
-  }
-  else {
-    req = httpRequest(reqOptions)
-  }
+  const client = http2.connect(url.format({
+    protocol: urls.protocol,
+    host: urls.hostname,
+    port: urls.port
+  }))
+
+  const req = client.request({
+    [http2.constants.HTTP2_HEADER_PATH]: urls.path
+  })
 
   if (options.timeout) {
     req.setTimeout(options.timeout)
@@ -130,7 +131,7 @@ exports.http = function http(options, callback) {
   req.on('error', callback)
 
   let timingStart = new Date()
-  req.on('response', response => {
+  req.on('response', headers => {
     let timingStop = new Date()
     let res = {
       timing: {
@@ -138,18 +139,17 @@ exports.http = function http(options, callback) {
         stop: timingStop
       },
       status: {
-        code: response.statusCode,
-        message: response.statusMessage
+        code: headers[http2.constants.HTTP2_HEADER_STATUS]
       },
-      headers: response.headers
+      headers: headers
     }
 
-    let status = response.statusCode
+    let status = headers[http2.constants.HTTP2_HEADER_STATUS]
 
     if (status >= 200 && status < 300 || status === 304) {
       let done = body => {
         res.body = body.toString()
-        if (rjson.test(response.headers['content-type'])) {
+        if (rjson.test(headers['content-type'])) {
           try {
             res.body = JSON.parse(res.body)
           }
@@ -165,13 +165,13 @@ exports.http = function http(options, callback) {
       }
       let buffers = []
 
-      response.on('data', chunk => {
+      req.on('data', chunk => {
         buffers.push(chunk)
       })
 
-      response.on('end', () => {
+      req.on('end', () => {
         let body = Buffer.concat(buffers)
-        if (response.headers['content-encoding'] === 'gzip') {
+        if (headers['content-encoding'] === 'gzip') {
           zlib.gunzip(body, (err, decode) => {
             if (err) {
               res.body = body.toString()
@@ -188,7 +188,7 @@ exports.http = function http(options, callback) {
       })
     }
     else {
-      callback(new HTTPError(response.statusMessage, status), res)
+      callback(new HTTPError('', status), res)
     }
   })
 
@@ -233,7 +233,7 @@ exports.fetch = async function fetch(options) {
   }
 
   return await new Promise((resolve, reject) => {
-    exports.http(options, (err, data, res, req) => {
+    exports.http2(options, (err, data, res, req) => {
       if (err) {
         cbr.monitor(uri)
         cbr.record(uri, false)
@@ -245,3 +245,4 @@ exports.fetch = async function fetch(options) {
     })
   })
 }
+

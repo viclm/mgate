@@ -12,6 +12,7 @@ const server = mgate({
 
 server.on('error', error => {
   console.log(`[ERROR]code=${error.code}||message=${error.message}`)
+  console.log(error.stack)
 })
 
 server.on('request', requests => {

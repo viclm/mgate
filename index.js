@@ -1,12 +1,12 @@
 const express = require('express')
 const debug = require('debug')('mgate:index')
+const func = require('./utils/func')
 const service = require('./service')
 const endpoint = require('./endpoint')
 const proxy = require('./proxy')
 
 const defaults = {
   port: 4869,
-  maxdepends: 2,
   skipnull: true,
   circuitbreaker: false,
   response(err, data) {
@@ -22,11 +22,9 @@ function createProxyRouter(endpoints, options) {
 
   endpoints.forEach(rule => {
     debug('endpoint router, path: %s, method: %s', rule.path, rule.method)
-    router[rule.method](rule.path, (req, res, next) => {
-      proxy.proxy(rule.graph, Object.assign({ request: req }, options), (error, data) => {
-        res.locals.proxy = { error, data }
-        next('router')
-      })
+    router[rule.method](rule.path, async (req, res, next) => {
+      res.locals.proxy = await func.multiple(proxy.proxy, rule.graph, Object.assign({ request: req }, options))
+      next('router')
     })
   })
 
@@ -58,7 +56,6 @@ class Server {
 
     app.use(createProxyRouter(this.endpoints, {
       services: this.services,
-      maxdepends: options.maxdepends,
       skipnull: options.skipnull,
       circuitbreaker: options.circuitbreaker,
       onstat(requests) {
@@ -68,7 +65,11 @@ class Server {
 
     app.use((req, res, next) => {
       if (res.locals.proxy) {
-        res.json(options.response.call(null, res.locals.proxy.error, res.locals.proxy.data))
+        const [ data, err ] = res.locals.proxy
+        if (err) {
+          app.emit('error', err)
+        }
+        res.json(options.response.call(null, err, data))
       }
       else {
         res.status(404).end()

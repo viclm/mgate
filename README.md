@@ -18,5 +18,7 @@ Lightweight gateway written in Node.
 ## Requirement
 Node.js 7.10.1 or higher
 
+Node.js 8.4.0 is required for HTTP/2 protocol(Experimental)
+
 ## License
 MIT

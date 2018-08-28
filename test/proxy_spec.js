@@ -1,8 +1,7 @@
 const test = require('ava')
 const sinon = require('sinon')
 const express = require('express')
-const pify = require('pify')
-const proxy = pify(require('../proxy').proxy)
+const proxy = require('../proxy').proxy
 
 const services = {
   local: {
