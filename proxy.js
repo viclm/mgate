@@ -1,6 +1,7 @@
 const debug = require('debug')('mgate:proxy')
 const func = require('./utils/func')
 const http = require('./protocols/http')
+const grpc = require('./protocols/grpc')
 
 class UnresolvedDependencyError extends Error {}
 
@@ -62,41 +63,62 @@ exports.proxy = async function proxy(graph, options) {
       throw new Error(`service ${serviceName} isn't registered`)
     }
 
-    if (service.protocol === 'http' || service.protocol === 'https') {
-      serviceOptions.circuitbreaker = circuitbreaker
-      serviceOptions.url = service.address + serviceOptions.path
-      delete serviceOptions.service
-      delete serviceOptions.path
-      const result = await http.fetch(serviceOptions)
-      fetchStat.push({
-        error: result.err,
-        response: result.res,
-        request: result.req
-      })
-      if (result.err) {
-        throw result.err
-      }
-      return result.data
-    }
-    else if (service.protocol === 'http2') {
-      const http2 = require('./protocols/http2')
-      serviceOptions.circuitbreaker = circuitbreaker
-      serviceOptions.url = service.address + serviceOptions.path
-      delete serviceOptions.service
-      delete serviceOptions.path
-      const result = await http2.fetch(serviceOptions)
-      fetchStat.push({
-        error: result.err,
-        response: result.res,
-        request: result.req
-      })
-      if (result.err) {
-        throw result.err
-      }
-      return result.data
+    let result
+
+    switch (service.protocol) {
+      case 'http':
+      case 'https':
+        serviceOptions.circuitbreaker = circuitbreaker
+        serviceOptions.url = service.address + serviceOptions.path
+        delete serviceOptions.service
+        delete serviceOptions.path
+        result = await http.fetch(serviceOptions)
+        fetchStat.push({
+          error: result.err,
+          response: result.res,
+          request: result.req
+        })
+        if (result.err) {
+          throw result.err
+        }
+        break
+      case 'http2':
+        const http2 = require('./protocols/http2')
+        serviceOptions.circuitbreaker = circuitbreaker
+        serviceOptions.url = service.address + serviceOptions.path
+        delete serviceOptions.service
+        delete serviceOptions.path
+        result = await http2.fetch(serviceOptions)
+        fetchStat.push({
+          error: result.err,
+          response: result.res,
+          request: result.req
+        })
+        if (result.err) {
+          throw result.err
+        }
+        break
+      case 'grpc':
+        result = await grpc.fetch({
+          address: service.address,
+          protobuf: service.protobuf,
+          method: serviceOptions.method,
+          payload: serviceOptions.payload,
+        })
+        fetchStat.push({
+          error: result.err,
+          response: result.res,
+          request: result.req
+        })
+        if (result.err) {
+          throw result.err
+        }
+        break
+      default:
+        throw new Error(`${service.protocol} protocol isn't supported`)
     }
 
-    throw new Error(`${service.protocol} protocol isn't supported`)
+    return result.data
   }
 
   async function resolveField(fieldKey, fieldBody) {
