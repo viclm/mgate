@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package hupu;
+
+service Hupu {
+  rpc getHomeLatestNews(LNReq) returns (LNRes) {}
+}
+
+message LNReq {
+  string league = 1;
+  optional int32 page = 2 [default = 1];
+}
+
+message LNRes {
+  message Item {
+    string title = 1;
+    string img   = 2;
+  }
+  int32  code = 1;
+  string msg  = 2;
+  repeated LNRes.Item result = 3;
+}

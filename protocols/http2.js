@@ -224,7 +224,7 @@ exports.fetch = async function fetch(options) {
 
   const cbr = new Proxy(circuitbreaker, {
     get(target, name) {
-      return options.circuitbreaker ? target[name] : () => {}
+      return options.service.circuitbreaker ? target[name] : () => {}
     }
   })
 

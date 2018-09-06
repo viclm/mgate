@@ -10,6 +10,7 @@ const circuitbreaker = require('../circuitbreaker')
 const rhttp = /^https?:\/\//
 const rjson = /^application\/json\b/
 const rformdata = /^multipart\/form-data\b/
+const rhump = /[\/\-_]+(.?)/g
 const rtrimqs = /(?:\?.*)?$/
 
 class HTTPError extends Error {
@@ -211,11 +212,17 @@ exports.http = function http(options, callback) {
 }
 
 exports.fetch = async function fetch(options) {
-  if (!options.url) {
-    throw new Error('http url is required')
-  }
   if (!options.method) {
     options.method = 'get'
+  }
+
+  const verify = options.service.verify && options.service.verify[`${options.method}-${options.path}`.replace(rhump, (s, p) => p.toUpperCase())]
+
+  if (verify) {
+    const err = verify.request(options.data)
+    if (err) {
+      throw new Error(err)
+    }
   }
 
   const url = options.url.replace(rtrimqs, '')
@@ -224,7 +231,7 @@ exports.fetch = async function fetch(options) {
 
   const cbr = new Proxy(circuitbreaker, {
     get(target, name) {
-      return options.circuitbreaker ? target[name] : () => {}
+      return options.service.circuitbreaker ? target[name] : () => {}
     }
   })
 
@@ -240,6 +247,9 @@ exports.fetch = async function fetch(options) {
       }
       else {
         cbr.record(uri, true)
+        if (verify && typeof data === 'object') {
+          const err = verify.response(data)
+        }
       }
       resolve({ err, data, res, req })
     })

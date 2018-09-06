@@ -1,7 +1,6 @@
 const debug = require('debug')('mgate:proxy')
 const func = require('./utils/func')
-const http = require('./protocols/http')
-const grpc = require('./protocols/grpc')
+const service = require('./service')
 
 class UnresolvedDependencyError extends Error {}
 
@@ -50,77 +49,6 @@ exports.proxy = async function proxy(graph, options) {
     }
   })
 
-  const fetchStat = []
-
-  async function fetchService(serviceName, serviceOptions) {
-    debug('fetch data from %s', serviceName)
-    if (serviceName === 'fake') {
-      return null
-    }
-
-    const service = services[serviceName]
-    if (!service) {
-      throw new Error(`service ${serviceName} isn't registered`)
-    }
-
-    let result
-
-    switch (service.protocol) {
-      case 'http':
-      case 'https':
-        serviceOptions.circuitbreaker = circuitbreaker
-        serviceOptions.url = service.address + serviceOptions.path
-        delete serviceOptions.service
-        delete serviceOptions.path
-        result = await http.fetch(serviceOptions)
-        fetchStat.push({
-          error: result.err,
-          response: result.res,
-          request: result.req
-        })
-        if (result.err) {
-          throw result.err
-        }
-        break
-      case 'http2':
-        const http2 = require('./protocols/http2')
-        serviceOptions.circuitbreaker = circuitbreaker
-        serviceOptions.url = service.address + serviceOptions.path
-        delete serviceOptions.service
-        delete serviceOptions.path
-        result = await http2.fetch(serviceOptions)
-        fetchStat.push({
-          error: result.err,
-          response: result.res,
-          request: result.req
-        })
-        if (result.err) {
-          throw result.err
-        }
-        break
-      case 'grpc':
-        result = await grpc.fetch({
-          address: service.address,
-          protobuf: service.protobuf,
-          method: serviceOptions.method,
-          payload: serviceOptions.payload,
-        })
-        fetchStat.push({
-          error: result.err,
-          response: result.res,
-          request: result.req
-        })
-        if (result.err) {
-          throw result.err
-        }
-        break
-      default:
-        throw new Error(`${service.protocol} protocol isn't supported`)
-    }
-
-    return result.data
-  }
-
   async function resolveField(fieldKey, fieldBody) {
     try {
       const { when, prefilter, convert, fallback } = fieldBody.original
@@ -139,10 +67,10 @@ exports.proxy = async function proxy(graph, options) {
       const fetchOptions = await func.promisify(prefilter, new Proxy(graphContext, {}))
       let result, err
       if (!Array.isArray(fetchOptions)) {
-        [result, err] = await func.multiple(fetchService, fetchOptions.service, fetchOptions)
+        [result, err] = await func.multiple(service.fetch, services, fetchOptions.service, fetchOptions)
       }
       else {
-        [result, err] = await func.multiple(Promise.all.bind(Promise), fetchOptions.map(o => fetchService(o.service, o)))
+        [result, err] = await func.multiple(Promise.all.bind(Promise), fetchOptions.map(o => service.fetch(services, o.service, o)))
       }
 
       if (err) {
@@ -194,7 +122,7 @@ exports.proxy = async function proxy(graph, options) {
   await resolve(resolvedGraph)
 
   if (onstat) {
-    onstat.call(null, fetchStat)
+    onstat.call(null, [])
   }
   const output = {}
   for (const key in resolvedGraph) {
