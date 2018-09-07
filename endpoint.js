@@ -1,10 +1,11 @@
-const fs = require('fs')
 const path = require('path')
 const debug = require('debug')('mgate:endpoint')
+const fsp = require('./utils/fsp')
 
-const rjs = /\.js$/
+const rasterisk = /\*$/
 const rindex = /\bindex$/
 const rHttpMethod = /^get|head|post|put|delete|connect|options|trace$/
+const rslash = /\//g
 
 function findRuleModules(dir) {
   let modules = []
@@ -27,29 +28,31 @@ function findRuleModules(dir) {
 }
 
 exports.parse = function parse(dir) {
-  if (!fs.existsSync(dir)) {
-    return []
-  }
-  dir = path.resolve(dir)
-  const basename = path.basename(dir)
-  const modules = findRuleModules(dir)
-  const allProxyRules = []
+  let modules = fsp.findModules(dir)
 
-  debug('resolved endpoint modules %O', modules)
-  modules.forEach(module => {
-    const expts = require(module)
-    const pathstr = '/' + path.relative(dir, module).slice(0, -3).replace(rindex, '*')
+  debug('resolved endpoint module files %O', modules)
+  modules = modules.reduce((accumulator, { name, filename, module }) => {
+    return accumulator.concat(
+      Object.keys(module)
+      .filter(method => {
+        return rHttpMethod.test(method)
+      })
+      .map(method => {
+        const pathstr = '/' + path.relative(dir, filename).slice(0, -3).replace(rindex, '*')
+        return { path: pathstr, method: method, graph: module[method] }
+      })
+    )
+  }, [])
 
-    for (const method in expts) {
-      if (!rHttpMethod.test(method)) {
-        continue
-      }
-
-      debug('resolved endpoint %O', { path: pathstr, method })
-      allProxyRules.push({ path: pathstr, method: method, graph: expts[method] })
+  modules.sort((a, b) => {
+    const na = a.path.match(rslash).length
+    const nb = b.path.match(rslash).length
+    if (na === nb) {
+      return Number(rasterisk.test(a.path))
     }
+    return nb - na
   })
 
-  return allProxyRules
+  return modules
 
 }

@@ -10,9 +10,7 @@ exports.proxy = async function proxy(graph, options) {
 
   const {
     services,
-    skipnull,
-    circuitbreaker,
-    onstat,
+    protocols,
     request = null
   } = options
 
@@ -67,10 +65,10 @@ exports.proxy = async function proxy(graph, options) {
       const fetchOptions = await func.promisify(prefilter, new Proxy(graphContext, {}))
       let result, err
       if (!Array.isArray(fetchOptions)) {
-        [result, err] = await func.multiple(service.fetch, services, fetchOptions.service, fetchOptions)
+        [result, err] = await func.multiple(service.fetch, services, protocols, fetchOptions.service, fetchOptions)
       }
       else {
-        [result, err] = await func.multiple(Promise.all.bind(Promise), fetchOptions.map(o => service.fetch(services, o.service, o)))
+        [result, err] = await func.multiple(Promise.all.bind(Promise), fetchOptions.map(o => service.fetch(services, protocols, o.service, o)))
       }
 
       if (err) {
@@ -121,13 +119,10 @@ exports.proxy = async function proxy(graph, options) {
 
   await resolve(resolvedGraph)
 
-  if (onstat) {
-    onstat.call(null, [])
-  }
   const output = {}
   for (const key in resolvedGraph) {
     const field = resolvedGraph[key]
-    if (field.public && (!skipnull || field.resolved !== null)) {
+    if (field.public) {
       output[key] = field.resolved
     }
   }

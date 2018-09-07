@@ -178,7 +178,7 @@ exports.http = function http(options, callback) {
       })
     }
     else {
-      callback(new Error(response.statusMessage), res)
+      callback(new Error(status), res)
     }
   })
 

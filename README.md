@@ -15,10 +15,13 @@ Lightweight gateway written in Node.
 - Circuit breaker
 - Authentication with JWT
 
-## Requirement
-Node.js 7.10.1 or higher
+## Status
+Under development.
 
-Node.js 8.4.0 is required for HTTP/2 protocol(Experimental)
+## Requirement
+Node.js 7.10.1 or higher.
+
+Node.js 8.4.0 is required for HTTP/2 protocol (Experimental).
 
 ## License
 MIT

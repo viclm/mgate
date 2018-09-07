@@ -1,4 +1,3 @@
-const http2 = require('http2')
 const zlib = require('zlib')
 const url = require('url')
 const querystring = require('querystring')
@@ -11,7 +10,8 @@ const rhttp = /^https?:\/\//
 const rjson = /^application\/json\b/
 const rformdata = /^multipart\/form-data\b/
 
-exports.http2 = function h2(options, callback) {
+exports.http2 = function http2(options, callback) {
+  const http2 = require('http2')
 
   let urls = url.parse(options.url)
   let timeout = options.timeout

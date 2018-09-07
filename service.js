@@ -1,26 +1,8 @@
-const fs = require('fs')
-const path = require('path')
 const protobuf = require('protobufjs')
 const debug = require('debug')('mgate:service')
+const fsp = require('./utils/fsp')
 
-const rjs = /\.js$/
 const rhttp = /^http/
-
-function findServiceModules(dir) {
-  return fs.readdirSync(dir)
-    .map(filename => path.join(dir, filename))
-    .reduce((found, filename) => {
-      const stat = fs.statSync(filename)
-      if (stat.isDirectory()) {
-        return found.concat(findServiceModules(filename))
-      }
-      else if (stat.isFile() && rjs.test(filename)) {
-        found.push(filename)
-        return found
-      }
-      return found
-    }, [])
-}
 
 function loadProtobuf(path) {
   const lookup = (obj, type, parentName) => {
@@ -62,29 +44,21 @@ function loadProtobuf(path) {
 }
 
 exports.parse = function parse(dir) {
-  if (!fs.existsSync(dir)) {
-    return {}
-  }
+  const modules = fsp.findModules(dir)
+  debug('resolved service module files %O', modules)
 
-  dir = path.resolve(dir)
-  const modules = findServiceModules(dir)
-  debug('resolved service modules %O', modules)
-
-  const services = modules.reduce((obj, filename) => {
-    const name = path.basename(filename, '.js')
-    const service = require(filename)
-    debug('resolved service %O', service)
-    if (service.idl && rhttp.test(service.protocol)) {
-      service.verify = loadProtobuf(service.idl)
+  const services = modules.reduce((accumulator, { name, module }) => {
+    if (module.idl && rhttp.test(module.protocol)) {
+      module.verify = loadProtobuf(module.idl)
     }
-    obj[name] = service
-    return obj
+    accumulator[name] = module
+    return accumulator
   }, {})
 
   return services
 }
 
-exports.fetch = async function fetch(services, name, options) {
+exports.fetch = async function fetch(services, protocols, name, options) {
   debug('fetch data from %s', name)
   if (name === 'fake') {
     return null
@@ -96,22 +70,15 @@ exports.fetch = async function fetch(services, name, options) {
   }
   options.service = service
 
-  let result
-
-  switch (service.protocol) {
-    case 'http':
-    case 'https':
-      result = await require('./protocols/http').fetch(options)
-      break
-    case 'http2':
-      result = await require('./protocols/http2').fetch(options)
-      break
-    case 'grpc':
-      result = await require('./protocols/grpc').fetch(options)
-      break
-    default:
-      throw new Error(`${service.protocol} protocol isn't supported`)
+  let protocol = protocols[service.protocol]
+  if (!protocol && service.protocol === 'https') {
+    protocol = protocols.http
   }
 
-  return result
+  if (!protocol) {
+    throw new Error(`${service.protocol} protocol isn't supported`)
+  }
+
+  return await protocol.fetch(options)
+
 }

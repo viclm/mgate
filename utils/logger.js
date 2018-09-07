@@ -20,7 +20,7 @@ const defaultFormat = format.printf(info => {
 const logger = winston.createLogger({
   format: format.combine(
     format.colorize(),
-    defaultFormat,
+    defaultFormat
   ),
   transports: [
     new winston.transports.Console()

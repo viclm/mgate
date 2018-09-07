@@ -7,7 +7,7 @@ service Hupu {
 }
 
 message LNReq {
-  string league = 1;
+  required string league = 1;
   optional int32 page = 2 [default = 1];
 }
 
