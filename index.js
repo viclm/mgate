@@ -53,10 +53,6 @@ class Server {
     this.app.use(...arguments)
   }
 
-  on() {
-    this.app.on(...arguments)
-  }
-
   start() {
     const { options, app } = this
 
@@ -69,7 +65,7 @@ class Server {
       if (res.locals.proxy) {
         const [ data, err ] = res.locals.proxy
         if (err) {
-          app.emit('error', err)
+          logger.error(err)
         }
         res.json(options.response.call(null, err, data))
       }
@@ -81,13 +77,11 @@ class Server {
     const server = app.listen(options.port)
 
     server.on('listening', () => {
-      debug('server running on port %d', options.port)
-      app.emit('listening')
+      logger.info(`server running on port ${options.port}`)
     })
 
     server.on('error', err => {
-      debug('server start fatal: %s', err.message)
-      app.emit('error', err)
+      logger.error(err)
     })
 
     this.stop = () => server.close()
