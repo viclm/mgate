@@ -5,20 +5,13 @@ const url = require('url')
 const querystring = require('querystring')
 const FormData = require('form-data')
 const debug = require('debug')('mgate:http')
+const logger = require('../utils/logger')
 const circuitbreaker = require('../circuitbreaker')
 
 const rhttp = /^https?:\/\//
 const rjson = /^application\/json\b/
 const rformdata = /^multipart\/form-data\b/
 const rhump = /[\/\-_]+(.?)/g
-const rtrimqs = /(?:\?.*)?$/
-
-class HTTPError extends Error {
-  constructor(message, status = 500) {
-    super(message)
-    this.status = status
-  }
-}
 
 exports.http = function http(options, callback) {
 
@@ -29,7 +22,7 @@ exports.http = function http(options, callback) {
   let method = 'get'
   let data, formdata
 
-  callback = (function (callback) {
+  callback = (callback => {
     return (err, res) => {
       const req = {
         url: options.url,
@@ -37,14 +30,10 @@ exports.http = function http(options, callback) {
         headers: headers,
         data: options.data
       }
-      if (err) {
-        callback(err, null, res, req)
-      }
-      else {
-        callback(null, res.body, res, req)
-      }
+      logger.http({ err, req, res })
+      callback(err, res && res.body)
     }
-  })(callback || function () {})
+  })(callback)
 
   if (options.headers) {
     for (let key in options.headers) {
@@ -189,7 +178,7 @@ exports.http = function http(options, callback) {
       })
     }
     else {
-      callback(new HTTPError(response.statusMessage, status), res)
+      callback(new Error(response.statusMessage), res)
     }
   })
 
@@ -212,11 +201,12 @@ exports.http = function http(options, callback) {
 }
 
 exports.fetch = async function fetch(options) {
-  if (!options.method) {
-    options.method = 'get'
-  }
+  options.method = options.method || 'get'
+  options.path = url.parse(options.path).pathname
+  options.url = url.resolve(options.service.address, options.path)
 
-  const verify = options.service.verify && options.service.verify[`${options.method}-${options.path}`.replace(rhump, (s, p) => p.toUpperCase())]
+  const verify = options.service.verify
+    && options.service.verify[`${options.method}-${options.path}`.replace(rhump, (s, p) => p.toUpperCase())]
 
   if (verify) {
     const err = verify.request(options.data)
@@ -225,9 +215,7 @@ exports.fetch = async function fetch(options) {
     }
   }
 
-  const url = options.url.replace(rtrimqs, '')
-  const method = options.method.toLowerCase()
-  const uri = `[${method}]${url}`
+  const uri = `[${options.method.toLowerCase()}]${options.url}`
 
   const cbr = new Proxy(circuitbreaker, {
     get(target, name) {
@@ -236,22 +224,31 @@ exports.fetch = async function fetch(options) {
   })
 
   if (cbr.check(uri)) {
-    throw new Error(`circuit break for ${method} ${url}`)
+    throw new Error(`circuit break for ${options.method} ${options.url}`)
   }
 
   return await new Promise((resolve, reject) => {
-    exports.http(options, (err, data, res, req) => {
+    exports.http(options, (err, result) => {
       if (err) {
         cbr.monitor(uri)
         cbr.record(uri, false)
+        reject(err)
       }
       else {
         cbr.record(uri, true)
-        if (verify && typeof data === 'object') {
-          const err = verify.response(data)
+        if (verify && typeof result === 'object') {
+          const err = verify.response(result)
+          if (err) {
+            reject(err)
+          }
+          else {
+            resolve(result)
+          }
+        }
+        else {
+          resolve(result)
         }
       }
-      resolve({ err, data, res, req })
     })
   })
 }

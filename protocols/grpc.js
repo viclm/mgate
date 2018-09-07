@@ -1,12 +1,13 @@
 const stream = require('stream')
 const grpc = require('grpc')
 const protoLoader = require('@grpc/proto-loader')
+const logger = require('../utils/logger')
 
-const connects = {}
+const Connects = {}
 
 function createGrpcClient(address, protobuf) {
-  if (connects.address) {
-    return connects.address
+  if (Connects[address]) {
+    return Connects[address]
   }
   const packageDefinition = grpc.loadPackageDefinition(
     protoLoader.loadSync(protobuf, {
@@ -20,27 +21,21 @@ function createGrpcClient(address, protobuf) {
   const packageName = Object.keys(packageDefinition)[0]
   const serviceName = Object.keys(packageDefinition[packageName])[0]
   const client = new packageDefinition[packageName][serviceName](address, grpc.credentials.createInsecure())
-  connects[address] = client
+  Connects[address] = client
   return client
 }
 
 exports.grpc = function grpcfunc(options, callback) {
-  const client = createGrpcClient(options.address, options.protobuf)
-
-  const req = {
-    method: options.method,
-    payload: options.payload,
-  }
-  const res = {
-    timing: {
-      start: new Date(),
-      stop: null
-    },
-  }
+  const client = createGrpcClient(options.service.address, options.service.idl)
 
   const call = client[options.method](options.payload, (err, data) => {
-    res.timing.stop = new Date()
-    callback(err, data, res, req)
+    logger.grpc({
+      method: options.method,
+      payload: options.payload,
+      result: data,
+      error: err
+    })
+    callback(err, data)
   })
 
   const data = []
@@ -48,19 +43,34 @@ exports.grpc = function grpcfunc(options, callback) {
     data.push(chunk)
   })
   call.on('end', () => {
-    res.timing.stop = new Date()
-    callback(null, data, res, req)
+    logger.grpc({
+      method: options.method,
+      payload: options.payload,
+      result: data,
+      error: null
+    })
+    callback(null, data)
   })
   call.on('error', err => {
-    res.timing.stop = new Date()
-    callback(err, null, res, req)
+    logger.grpc({
+      method: options.method,
+      payload: options.payload,
+      result: null,
+      error: err
+    })
+    callback(err)
   })
 }
 
 exports.fetch = async function fetch(options) {
   return await new Promise((resolve, reject) => {
-    exports.grpc(options, (err, data, res, req) => {
-      resolve({ err, data, res, req })
+    exports.grpc(options, (err, result) => {
+      if (err) {
+        reject(err)
+      }
+      else {
+        resolve(result)
+      }
     })
   })
 }

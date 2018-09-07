@@ -1,5 +1,6 @@
 const express = require('express')
 const debug = require('debug')('mgate:index')
+const logger = require('./utils/logger')
 const func = require('./utils/func')
 const service = require('./service')
 const endpoint = require('./endpoint')
@@ -8,7 +9,7 @@ const proxy = require('./proxy')
 const defaults = {
   port: 4869,
   skipnull: true,
-  circuitbreaker: false,
+  logger: null,
   response(err, data) {
     return {
       error: err ? { message: err.message } : null,
@@ -35,6 +36,10 @@ class Server {
   constructor(options) {
     this.options = options
 
+    if (options.logger) {
+      logger.configure(options.logger)
+    }
+
     this.app = express()
     this.app.use(express.json())
     this.app.use(express.urlencoded({ extended: true }))
@@ -56,11 +61,7 @@ class Server {
 
     app.use(createProxyRouter(this.endpoints, {
       services: this.services,
-      skipnull: options.skipnull,
-      circuitbreaker: options.circuitbreaker,
-      onstat(requests) {
-        app.emit('request', requests)
-      }
+      skipnull: options.skipnull
     }))
 
     app.use((req, res, next) => {

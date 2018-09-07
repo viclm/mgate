@@ -94,41 +94,24 @@ exports.fetch = async function fetch(services, name, options) {
   if (!service) {
     throw new Error(`service ${name} isn't registered`)
   }
+  options.service = service
 
   let result
 
   switch (service.protocol) {
     case 'http':
     case 'https':
-      options.service = service
-      options.url = service.address + options.path
       result = await require('./protocols/http').fetch(options)
-      if (result.err) {
-        throw result.err
-      }
       break
     case 'http2':
-      options.service = service
-      options.url = service.address + options.path
       result = await require('./protocols/http2').fetch(options)
-      if (result.err) {
-        throw result.err
-      }
       break
     case 'grpc':
-      result = await require('./protocols/grpc').fetch({
-        address: service.address,
-        protobuf: service.idl,
-        method: options.method,
-        payload: options.payload,
-      })
-      if (result.err) {
-        throw result.err
-      }
+      result = await require('./protocols/grpc').fetch(options)
       break
     default:
       throw new Error(`${service.protocol} protocol isn't supported`)
   }
 
-  return result.data
+  return result
 }
