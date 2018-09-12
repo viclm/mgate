@@ -1,6 +1,6 @@
 const mgate = require('../../')
 
-const server = mgate({
+mgate({
   upload: {
     route: /upload/,
     files: 1,
@@ -8,5 +8,3 @@ const server = mgate({
     filetype: /image/
   }
 })
-
-server.start()

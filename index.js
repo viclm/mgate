@@ -6,10 +6,12 @@ const protocol = require('./protocol')
 const service = require('./service')
 const endpoint = require('./endpoint')
 const proxy = require('./proxy')
+const ratelimiting = require('./ratelimiting')
 
 const defaults = {
   port: 4869,
   logger: null,
+  middlewares: [],
   response(err, data) {
     return {
       error: err ? { message: err.message } : null,
@@ -32,63 +34,53 @@ function createProxyRouter(endpoints, options) {
   return router
 }
 
-class Server {
-  constructor(options) {
-    this.options = options
-
-    if (options.logger) {
-      logger.configure(options.logger)
-    }
-
-    this.app = express()
-    this.app.use(express.json())
-    this.app.use(express.urlencoded({ extended: true }))
-
-    this.protocols = protocol.parse('protocols')
-    this.services = service.parse('services')
-    this.endpoints = endpoint.parse('endpoints')
-  }
-
-  use() {
-    this.app.use(...arguments)
-  }
-
-  start() {
-    const { options, app } = this
-
-    app.use(createProxyRouter(this.endpoints, {
-      services: this.services,
-      protocols: this.protocols
-    }))
-
-    app.use((req, res, next) => {
-      if (res.locals.proxy) {
-        const [ data, err ] = res.locals.proxy
-        if (err) {
-          logger.error(err)
-        }
-        res.json(options.response.call(null, err, data))
-      }
-      else {
-        res.status(404).end()
-      }
-    })
-
-    const server = app.listen(options.port)
-
-    server.on('listening', () => {
-      logger.info(`server running on port ${options.port}`)
-    })
-
-    server.on('error', err => {
-      logger.error(err)
-    })
-
-    this.stop = () => server.close()
-  }
-}
-
 module.exports = function createServer(options) {
   options = Object.assign({}, defaults, options)
-  return new Server(options)
+
+  if (options.logger) {
+    logger.configure(options.logger)
+  }
+
+  const protocols = protocol.parse('protocols')
+  const services = service.parse('services')
+  const endpoints = endpoint.parse('endpoints')
+
+  const app = express()
+  app.use(express.json())
+  app.use(express.urlencoded({ extended: true }))
+
+  options.middlewares.forEach(middleware => app.use(middleware))
+
+  app.use(createProxyRouter(endpoints, { services, protocols }))
+
+  app.use((req, res, next) => {
+    if (res.locals.proxy) {
+      const [ data, err ] = res.locals.proxy
+      if (err) {
+        logger.error(err)
+      }
+      res.json(options.response.call(null, err, data))
+    }
+    else {
+      res.status(404).end()
+    }
+  })
+
+  for (const name in services) {
+    if (services[name].ratelimiting) {
+      ratelimiting.init(name, services[name].ratelimiting)
+    }
+  }
+
+  const server = app.listen(options.port)
+
+  server.on('listening', () => {
+    logger.info(`server running on port ${options.port}`)
+  })
+
+  server.on('error', err => {
+    logger.error(err)
+  })
+
+  return () => server.close()
 }

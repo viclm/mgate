@@ -1,6 +1,7 @@
 const protobuf = require('protobufjs')
 const debug = require('debug')('mgate:service')
 const fsp = require('./utils/fsp')
+const ratelimiting = require('./ratelimiting')
 
 const rhttp = /^http/
 
@@ -77,6 +78,10 @@ exports.fetch = async function fetch(services, protocols, name, options) {
 
   if (!protocol) {
     throw new Error(`${service.protocol} protocol isn't supported`)
+  }
+
+  if (service.ratelimiting && !ratelimiting.consume(name)) {
+    throw new Error(`too many requests for service ${name}`)
   }
 
   return await protocol.fetch(options)
