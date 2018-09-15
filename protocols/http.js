@@ -4,7 +4,6 @@ const querystring = require('querystring')
 const FormData = require('form-data')
 const debug = require('debug')('mgate:http')
 const logger = require('../utils/logger')
-const circuitbreaker = require('../circuitbreaker')
 
 const rhttp = /^https?:\/\//
 const rjson = /^application\/json\b/
@@ -232,28 +231,13 @@ exports.fetch = async function fetch(options) {
     }
   }
 
-  const uri = `[${options.method.toLowerCase()}]${options.url}`
-
-  const cbr = new Proxy(circuitbreaker, {
-    get(target, name) {
-      return options.service.circuitbreaker ? target[name] : () => {}
-    }
-  })
-
-  if (cbr.check(uri)) {
-    throw new Error(`circuit break for ${options.method} ${options.url}`)
-  }
-
   return await new Promise((resolve, reject) => {
     options.protocol = options.service.protocol
     http(options, (err, result) => {
       if (err) {
-        cbr.monitor(uri)
-        cbr.record(uri, false)
         reject(err)
       }
       else {
-        cbr.record(uri, true)
         if (verify) {
           const err = verify.response(result)
           if (err) {

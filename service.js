@@ -1,7 +1,9 @@
 const protobuf = require('protobufjs')
 const debug = require('debug')('mgate:service')
+const func = require('./utils/func')
 const fsp = require('./utils/fsp')
 const ratelimiting = require('./ratelimiting')
+const circuitbreaker = require('./circuitbreaker')
 
 const rhttp = /^http[s2]?$/
 
@@ -81,6 +83,27 @@ exports.fetch = async function fetch(services, protocols, name, options) {
     throw new Error(`too many requests for service ${name}`)
   }
 
-  return await protocol.fetch(options)
+  if (service.circuitbreaker) {
+    const uri = `${service.address}${options.path || options.method}`
+
+    if (circuitbreaker.check(uri)) {
+      throw new Error(`service ${name} is unavailable`)
+    }
+
+    const [result, err] = await func.multiple(protocol.fetch, options)
+
+    if (err) {
+      circuitbreaker.monitor(uri)
+      circuitbreaker.record(uri, false)
+      throw err
+    }
+    else {
+      circuitbreaker.record(uri, true)
+      return result
+    }
+  }
+  else {
+    return await protocol.fetch(options)
+  }
 
 }
