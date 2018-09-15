@@ -4,15 +4,7 @@ const Busboy = require('busboy')
 const createServer = require('http').createServer
 const zlib = require('zlib')
 const http = require('../protocols/http').http
-
-const httpro = function (options, callback) {
-  return new Promise((resolve, reject) => {
-    http(options, (err, result) => {
-      callback && callback(err, result)
-      resolve()
-    })
-  })
-}
+const https = require('../protocols/http').https
 
 let server
 
@@ -38,54 +30,23 @@ test.afterEach.always(t => {
   server.close()
 })
 
-test.serial('node-style error-first callback API', async t => {
-  t.plan(3)
-
-  server.on('/api/1', (req, res) => {
-    res.end('ok')
-  })
-
-  server.on('/api/2', (req, res) => {
-    res.writeHead(404)
-    res.end('ok')
-  })
-
-  await httpro({
-    url: `${server.url}/api/1`
-  }, (err, result) => {
-    t.is(err, null)
-    t.is(result, 'ok')
-  })
-
-  await httpro({
-    url: `${server.url}/api/2`
-  }, (err, result) => {
-    t.true(err instanceof Error)
-  })
-
-})
-
 test.serial('timeout', async t => {
-  t.plan(3)
+  t.plan(2)
 
   server.on('/api/1', (req, res) => {
     setTimeout(() => res.end('ok'), 50)
   })
 
-  await httpro({
+  await t.throws(http({
     url: `${server.url}/api/1`,
     timeout: 10
-  }, (err, result) => {
-    t.true(err instanceof Error)
-  })
+  }))
 
-  await httpro({
+  const result = await http({
     url: `${server.url}/api/1`,
     timeout: 90
-  }, (err, result) => {
-    t.is(err, null)
-    t.is(result, 'ok')
   })
+  t.is(result, 'ok')
 })
 
 test.serial('method', async t => {
@@ -101,18 +62,18 @@ test.serial('method', async t => {
     res.end()
   })
 
-  await httpro({
+  await http({
     url: `${server.url}/api/1`,
   })
 
-  await httpro({
+  await http({
     url: `${server.url}/api/2`,
     method: 'post'
   })
 
 })
 
-test.serial('custom headers', async t => {
+test.serial('headers', async t => {
   t.plan(2)
 
   server.on('/api/1', (req, res) => {
@@ -121,7 +82,7 @@ test.serial('custom headers', async t => {
     res.end()
   })
 
-  await httpro({
+  await http({
     url: `${server.url}/api/1`,
     headers: {
       'content-type': 'application/json',
@@ -146,7 +107,7 @@ test.serial('send data', async t => {
     })
   })
 
-  await httpro({
+  await http({
     url: `${server.url}/api/1`,
     method: 'get',
     data: {
@@ -154,7 +115,7 @@ test.serial('send data', async t => {
     }
   })
 
-  await httpro({
+  await http({
     url: `${server.url}/api/2`,
     method: 'post',
     data: {
@@ -176,7 +137,7 @@ test.serial('application/octet-stream', async t => {
     })
   })
 
-  await httpro({
+  await http({
     url: `${server.url}/api/1`,
     method: 'post',
     data: Buffer.from('abcdef', 'hex'),
@@ -197,7 +158,7 @@ test.serial('text/plain', async t => {
     })
   })
 
-  await httpro({
+  await http({
     url: `${server.url}/api/1`,
     method: 'post',
     data: 'foo',
@@ -218,7 +179,7 @@ test.serial('application/x-www-form-urlencoded', async t => {
     })
   })
 
-  await httpro({
+  await http({
     url: `${server.url}/api/1`,
     method: 'post',
     data: {
@@ -247,7 +208,7 @@ test.serial('application/json', async t => {
     })
   })
 
-  await httpro({
+  await http({
     url: `${server.url}/api/1`,
     method: 'post',
     data: {
@@ -271,7 +232,7 @@ test.serial('multipart/form-data', async t => {
     req.pipe(busboy)
   })
 
-  await httpro({
+  await http({
     url: `${server.url}/api/1`,
     method: 'post',
     data: {
@@ -283,7 +244,7 @@ test.serial('multipart/form-data', async t => {
 })
 
 test.serial('json', async t => {
-  t.plan(5)
+  t.plan(3)
 
   server.on('/api/1', (req, res) => {
     res.setHeader('content-type', 'application/json')
@@ -302,25 +263,19 @@ test.serial('json', async t => {
     res.end()
   })
 
-  await httpro({
+  const result1 = await http({
     url: `${server.url}/api/1`
-  }, (err, result) => {
-    t.is(err, null)
-    t.deepEqual(result, { foo: 'bar' })
   })
+  t.deepEqual(result1, { foo: 'bar' })
 
-  await httpro({
+  const result2 = await http({
     url: `${server.url}/api/2`
-  }, (err, result) => {
-    t.is(err, null)
-    t.is(result, '{"foo": "bar"}')
   })
+  t.is(result2, '{"foo": "bar"}')
 
-  await httpro({
+  await t.throws(http({
     url: `${server.url}/api/3`
-  }, (err, result) => {
-    t.true(err instanceof Error)
-  })
+  }))
 
 })
 
@@ -331,21 +286,19 @@ test.serial('unvalid datatype', async t => {
     res.end('ok')
   })
 
-  await httpro({
+  await t.throws(http({
     url: `${server.url}/api/1`,
     method: 'post',
     data: {
       foo: 'bar'
     },
     datatype: 'xxx'
-  }, (err, result) => {
-    t.true(err instanceof Error)
-  })
+  }))
 
 })
 
 test.serial('gzip', async t => {
-  t.plan(3)
+  t.plan(2)
 
   server.on('/api/1', (req, res) => {
     res.setHeader('content-encoding', 'gzip')
@@ -359,23 +312,19 @@ test.serial('gzip', async t => {
     res.end()
   })
 
-  await httpro({
+  const result = await http({
     url: `${server.url}/api/1`
-  }, (err, result) => {
-    t.is(err, null)
-    t.is(result, 'ok')
   })
+  t.is(result, 'ok')
 
-  await httpro({
+  await t.throws(http({
     url: `${server.url}/api/2`
-  }, (err, result) => {
-    t.true(err instanceof Error)
-  })
+  }))
 
 })
 
 test.serial('https', async t => {
-  t.plan(2)
+  t.plan(1)
 
   const NODE_TLS_REJECT_UNAUTHORIZED = process.env.NODE_TLS_REJECT_UNAUTHORIZED
   process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
@@ -398,12 +347,10 @@ test.serial('https', async t => {
     })
   })
 
-  await httpro({
+  const result = await https({
     url: `https://localhost:${server.address().port}/api/i`
-  }, (err, result) => {
-    t.is(err, null)
-    t.is(result, 'ok')
   })
+  t.is(result, 'ok')
 
   server.close()
   process.env.NODE_TLS_REJECT_UNAUTHORIZED = NODE_TLS_REJECT_UNAUTHORIZED

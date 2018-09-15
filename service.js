@@ -3,7 +3,7 @@ const debug = require('debug')('mgate:service')
 const fsp = require('./utils/fsp')
 const ratelimiting = require('./ratelimiting')
 
-const rhttp = /^http/
+const rhttp = /^http[s2]?$/
 
 function loadProtobuf(path) {
   const lookup = (obj, type, parentName) => {
@@ -71,13 +71,10 @@ exports.fetch = async function fetch(services, protocols, name, options) {
   }
   options.service = service
 
-  let protocol = protocols[service.protocol]
-  if (!protocol && service.protocol === 'https') {
-    protocol = protocols.http
-  }
+  let protocol = protocols[rhttp.test(service.protocol) ? 'http' : service.protocol]
 
   if (!protocol) {
-    throw new Error(`${service.protocol} protocol isn't supported`)
+    throw new Error(`protocol ${service.protocol} isn't supported`)
   }
 
   if (service.ratelimiting && !ratelimiting.consume(name)) {

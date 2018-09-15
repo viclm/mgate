@@ -1,5 +1,3 @@
-const httpRequest = require('http').request
-const httpsRequest = require('https').request
 const zlib = require('zlib')
 const url = require('url')
 const querystring = require('querystring')
@@ -13,36 +11,31 @@ const rjson = /^application\/json\b/
 const rformdata = /^multipart\/form-data\b/
 const rhump = /[\/\-_]+(.?)/g
 
-exports.http = function http(options, callback) {
+function http(options, callback) {
 
+  let protocol = options.protocol || 'http'
   let urls = url.parse(options.url)
-  let timeout = options.timeout
+  let method = options.method ? options.method.toLowerCase() : 'get'
   let datatype = options.datatype ? options.datatype.toLowerCase() : 'urlencoded'
+  let timeout = options.timeout
   let headers = {}
-  let method = 'get'
   let data, formdata
 
-  callback = (callback => {
-    return (err, res) => {
-      const req = {
-        url: options.url,
-        method: method,
-        headers: headers,
-        data: options.data
-      }
-      logger.http({ err, req, res })
-      callback(err, res && res.body)
+  let done = (err, res) => {
+    const req = {
+      url: options.url,
+      method: method,
+      headers: headers,
+      data: options.data
     }
-  })(callback)
+    logger.http({ err, req, res })
+    callback(err, res && res.body)
+  }
 
   if (options.headers) {
     for (let key in options.headers) {
       headers[key.toLowerCase()] = options.headers[key]
     }
-  }
-
-  if (options.method) {
-    method = options.method.toLowerCase()
   }
 
   if (method === 'get' || method === 'head') {
@@ -85,7 +78,7 @@ exports.http = function http(options, callback) {
         headers['content-type'] = 'application/octet-stream'
       }
       else {
-        callback(new Error('unvalid datatype: ' + datatype))
+        done(new Error('unvalid datatype: ' + datatype))
         return
       }
       headers['content-length'] = Buffer.byteLength(data)
@@ -103,11 +96,19 @@ exports.http = function http(options, callback) {
 
   debug('http request %O', reqOptions)
 
-  if (urls.protocol === 'https:') {
-    req = httpsRequest(reqOptions)
+  if (protocol === 'http2') {
+    const client = require(protocol).connect(url.format({
+      protocol: urls.protocol,
+      host: urls.hostname,
+      port: urls.port
+    }))
+
+    req = client.request({
+      ':path': urls.path
+    })
   }
   else {
-    req = httpRequest(reqOptions)
+    req = require(protocol).request(reqOptions)
   }
 
   if (options.timeout) {
@@ -117,42 +118,32 @@ exports.http = function http(options, callback) {
     })
   }
 
-  req.on('error', callback)
+  req.on('error', done)
 
   let timingStart = new Date()
   req.on('response', response => {
     let timingStop = new Date()
+    let headers, status
+
+    if (protocol === 'http2') {
+      headers = response
+      status = headers[':status']
+      response = req
+    }
+    else {
+      headers = response.headers
+      status = response.statusCode
+    }
+
     let res = {
       timing: {
         start: timingStart,
         stop: timingStop
       },
-      status: {
-        code: response.statusCode,
-        message: response.statusMessage
-      },
-      headers: response.headers
+      headers, status
     }
 
-    let status = response.statusCode
-
     if (status >= 200 && status < 300 || status === 304) {
-      let done = body => {
-        res.body = body.toString()
-        if (rjson.test(response.headers['content-type'])) {
-          try {
-            res.body = JSON.parse(res.body)
-          }
-          catch (e) {
-            callback(new Error('unvalid json'), res)
-            return
-          }
-          callback(null, res)
-        }
-        else {
-          callback(null, res)
-        }
-      }
       let buffers = []
 
       response.on('data', chunk => {
@@ -160,25 +151,35 @@ exports.http = function http(options, callback) {
       })
 
       response.on('end', () => {
-        let body = Buffer.concat(buffers)
-        if (response.headers['content-encoding'] === 'gzip') {
-          zlib.gunzip(body, (err, decode) => {
-            if (err) {
-              res.body = body.toString()
-              callback(err, res)
-            }
-            else {
-              done(decode)
-            }
-          })
+        res.body = Buffer.concat(buffers)
+
+        if (headers['content-encoding'] === 'gzip') {
+          try {
+            res.body = zlib.gunzipSync(res.body)
+          }
+          catch (err) {
+            done(err, res)
+            return
+          }
         }
-        else {
-          done(body)
+
+        res.body = res.body.toString()
+
+        if (rjson.test(headers['content-type'])) {
+          try {
+            res.body = JSON.parse(res.body)
+          }
+          catch (e) {
+            done(new Error('unvalid json'), res)
+            return
+          }
         }
+
+        done(null, res)
       })
     }
     else {
-      callback(new Error(status), res)
+      done(new Error(status), res)
     }
   })
 
@@ -199,6 +200,22 @@ exports.http = function http(options, callback) {
   return req
 
 }
+
+['http', 'https', 'http2'].forEach(protocol => {
+  exports[protocol] = function (options) {
+    return new Promise((resolve, reject) => {
+      options.protocol = protocol
+      http(options, (err, result) => {
+        if (err) {
+          reject(err)
+        }
+        else {
+          resolve(result)
+        }
+      })
+    })
+  }
+})
 
 exports.fetch = async function fetch(options) {
   options.method = options.method || 'get'
@@ -228,7 +245,8 @@ exports.fetch = async function fetch(options) {
   }
 
   return await new Promise((resolve, reject) => {
-    exports.http(options, (err, result) => {
+    options.protocol = options.service.protocol
+    http(options, (err, result) => {
       if (err) {
         cbr.monitor(uri)
         cbr.record(uri, false)
@@ -236,7 +254,7 @@ exports.fetch = async function fetch(options) {
       }
       else {
         cbr.record(uri, true)
-        if (verify && typeof result === 'object') {
+        if (verify) {
           const err = verify.response(result)
           if (err) {
             reject(err)
