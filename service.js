@@ -63,10 +63,6 @@ exports.parse = function parse(dir) {
 
 exports.fetch = async function fetch(services, protocols, name, options) {
   debug('fetch data from %s', name)
-  if (name === 'fake') {
-    return null
-  }
-
   const service = services[name]
   if (!service) {
     throw new Error(`service ${name} isn't registered`)

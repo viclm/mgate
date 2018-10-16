@@ -48,51 +48,59 @@ exports.proxy = async function proxy(graph, options) {
   })
 
   async function resolveField(fieldKey, fieldBody) {
+    const { prefilter, convert, fallback } = fieldBody.original
+    let result = null, hasThrown = false
+
     try {
-      const { prefilter, convert, fallback } = fieldBody.original
+      if (prefilter) {
+        const fetchOptions = await func.promisify(prefilter, new Proxy(graphContext, {}))
 
-      if (!prefilter) {
-        throw new Error('prefilter is required')
-      }
+        if (!fetchOptions) {
+          return
+        }
 
-      const fetchOptions = await func.promisify(prefilter, new Proxy(graphContext, {}))
+        let requestErr
 
-      if (fetchOptions === false) {
-        fieldBody.resolved = null
-        return
-      }
-
-      let result, err
-
-      if (!Array.isArray(fetchOptions)) {
-        [result, err] = await func.multiple(service.fetch, services, protocols, fetchOptions.service, fetchOptions)
-      }
-      else {
-        [result, err] = await func.multiple(Promise.all.bind(Promise), fetchOptions.map(o => service.fetch(services, protocols, o.service, o)))
-      }
-
-      if (err) {
-        if (fallback) {
-          result = await func.promisify(fallback, new Proxy(graphContext, {}))
+        if (Array.isArray(fetchOptions)) {
+          [result, requestErr] = await func.multiple(
+            Promise.all.bind(Promise),
+            fetchOptions.map(o => service.fetch(services, protocols, o.service, o))
+          )
         }
         else {
-          throw err
+          [result, requestErr] = await func.multiple(
+            service.fetch, services, protocols, fetchOptions.service, fetchOptions
+          )
+        }
+
+        if (requestErr) {
+          if (fallback) {
+            result = await func.promisify(fallback, new Proxy(graphContext, {}))
+          }
+          else {
+            throw requestErr
+          }
         }
       }
-      else if (convert) {
+
+      if (convert) {
         result = await func.promisify(convert, new Proxy(graphContext, {
           get(target, name) { return name === fieldKey ? result : target[name] }
         }))
       }
-
-      fieldBody.resolved = result
     }
     catch (err) {
+      hasThrown = true
       if (err instanceof UnresolvedDependencyError) {
         fieldBody.depends.push(err.message)
       }
       else {
         throw err
+      }
+    }
+    finally {
+      if (!hasThrown) {
+        fieldBody.resolved = result
       }
     }
   }
