@@ -123,6 +123,30 @@ test('merge multiple dependent request', async t => {
 
 })
 
+test('return false in prefilter to skip a request', async t => {
+  t.plan(2)
+
+  await proxy({
+    xxx:{
+      prefilter() {
+        return {
+          service: 'local',
+          path: '/api/xxx',
+        }
+      }
+    },
+    yyy:{
+      prefilter() {
+        return false
+      }
+    }
+  }, ProxyOptions).then(result => {
+    t.deepEqual(result, { xxx: '[GET]xxx', 'yyy': null })
+    t.notDeepEqual(result, { xxx: '[GET]xxx', yyy: '[GET]yyy' })
+  })
+
+})
+
 test('private key is not contained in the final response', async t => {
   t.plan(1)
 
@@ -181,42 +205,3 @@ test('use fallback function to fake result when a request broken', async t => {
     }
   }, ProxyOptions).then(result => t.deepEqual(result, { xxx: '[FALLBACK]xxx' }))
 })
-// test('use when function to switch a request', async t => {
-//   t.plan(4)
-
-//   await proxy({
-//     x1:{
-//       url: `${remote}/api/x1`,
-//       method: 'get',
-//       when() { return true }
-//     },
-//     x2:{
-//       url: `${remote}/api/x2`,
-//       method: 'get',
-//       when() { return Promise.resolve(false) }
-//     }
-//   }).then(result => {
-//     t.deepEqual(result, { x1: '[GET]x1' })
-//     t.notDeepEqual(result, { x1: '[GET]x1', x2: '[GET]x2' })
-//   })
-
-//   await t.throws(proxy({
-//     xxx: {
-//       url: `${remote}/api/xxx`,
-//       method: 'get',
-//       when() {
-//         throw new Error('throw')
-//       }
-//     }
-//   }))
-
-//   await t.throws(proxy({
-//     xxx: {
-//       url: `${remote}/api/xxx`,
-//       method: 'get',
-//       when() {
-//         return Promise.reject(new Error('reject'))
-//       }
-//     }
-//   }))
-// })

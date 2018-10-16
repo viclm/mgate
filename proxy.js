@@ -49,21 +49,21 @@ exports.proxy = async function proxy(graph, options) {
 
   async function resolveField(fieldKey, fieldBody) {
     try {
-      const { when, prefilter, convert, fallback } = fieldBody.original
-
-      if (when) {
-        if (await func.promisify(when, new Proxy(graphContext, {})) === false) {
-          fieldBody.resolved = null
-          return
-        }
-      }
+      const { prefilter, convert, fallback } = fieldBody.original
 
       if (!prefilter) {
         throw new Error('prefilter is required')
       }
 
       const fetchOptions = await func.promisify(prefilter, new Proxy(graphContext, {}))
+
+      if (fetchOptions === false) {
+        fieldBody.resolved = null
+        return
+      }
+
       let result, err
+
       if (!Array.isArray(fetchOptions)) {
         [result, err] = await func.multiple(service.fetch, services, protocols, fetchOptions.service, fetchOptions)
       }
