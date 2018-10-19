@@ -1,87 +1,93 @@
 const debug = require('debug')('mgate:circuitbreaker')
 const timer = require('./utils/timer')
 
-const STATUS_OPEN = 'open'
-const STATUS_HARFOPEN = 'harfopen'
-const STATUS_CLOSE = 'close'
+const STATE_OPEN = 'open'
+const STATE_HARFOPEN = 'harfopen'
+const STATE_CLOSE = 'close'
 
-const Poll = {
-  entries: {},
-  limit: 1000,
-  get(key) {
-    return this.entries[key]
-  },
-  set(key, value) {
-    if (this.limit > 0) {
-      this.entries[key] = value
+class CircuitBreaker {
+  constructor(options = {}) {
+    this.monitorTimeout = options.monitorTimeout || 10
+    this.recoverTimeout = options.recoverTimeout || 5
+    this.failureThreshold = options.failureThreshold || 0.5
+
+    this.state = STATE_CLOSE
+    this.monitoring = false
+    this.successCount = 0
+    this.failureCount = 0
+    this.overallCount = 0
+  }
+
+  async call(action, ...args) {
+    this.overallCount++
+    if (this.state === STATE_OPEN
+      || this.state === STATE_HARFOPEN && this.overallCount % 5 !== 1) {
+      throw new Error('circuit breaker')
     }
-  },
-  del(key) {
-    delete this.entries[key]
-  }
-}
 
-exports.monitor = function (uri) {
-  if (Poll.get(uri)) {
-    return
-  }
-  debug('monitoring for %s', uri)
-
-  let stat = {
-    status: STATUS_CLOSE,
+    let ret
+    try {
+      ret = await action(...args)
+    }
+    catch (err) {
+      this.record(false)
+      throw err
+    }
+    this.record(true)
+    return ret
   }
 
-  const run = () => {
-    stat.success = 0
-    stat.failuire = 0
-    timer.delay(10, () => {
-      if (stat.failuire > stat.success) {
-        debug('open for %s', uri)
-        stat.status = STATUS_OPEN
-        timer.delay(5, () => {
-          debug('harlopen for %s', uri)
-          stat.status = STATUS_HARFOPEN
-          run()
-        })
-      }
-      else {
-        debug('close for %s', uri)
-        Poll.del(uri)
-      }
-    })
+  monitor() {
+    if (this.monitoring) {
+      return
+    }
+
+    const run = () => {
+      debug('monitoring')
+      this.monitoring = true
+      this.successCount = 0
+      this.failureCount = 0
+      this.overallCount = 0
+      timer.delay(this.monitorTimeout, () => {
+        this.monitoring = false
+        if (this.failureCount / (this.successCount + this.failureCount) >= this.failureThreshold) {
+          debug('open')
+          this.state = STATE_OPEN
+          timer.delay(this.recoverTimeout, () => {
+            debug('halfopen')
+            this.state = STATE_HARFOPEN
+            run()
+          })
+        }
+        else {
+          debug('close')
+          this.state = STATE_CLOSE
+        }
+      })
+    }
+
+    run()
   }
 
-  Poll.set(uri, stat)
-
-  run()
-}
-
-exports.record = function (uri, isOk) {
-  let stat = Poll.get(uri)
-  if (stat) {
-    if (isOk) {
-      stat.success++
+  record(success) {
+    this.monitor()
+    if (success) {
+      this.successCount++
     }
     else {
-      stat.failuire++
+      this.failureCount++
     }
   }
 }
 
-exports.check = function (uri) {
-  let stat = Poll.get(uri)
-  let ret = false
-  if (stat) {
-    if (stat.status === STATUS_OPEN) {
-      ret = true
-    }
-    else if (stat.status === STATUS_HARFOPEN) {
-      ret = Math.random() > 0.5
-    }
-  }
-  return ret
+const Poll = {}
+
+exports.CircuitBreaker = CircuitBreaker
+
+exports.init = function init(name, options) {
+  Poll[name] = new CircuitBreaker(options)
 }
 
-exports.stat = function (uri) {
-  return Poll.get(uri)
+exports.call = async function call(name, action, ...args) {
+  return await Poll[name].call(action, ...args)
 }

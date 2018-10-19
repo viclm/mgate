@@ -80,23 +80,7 @@ exports.fetch = async function fetch(services, protocols, name, options) {
   }
 
   if (service.circuitbreaker) {
-    const uri = `${service.address}${options.path || options.method}`
-
-    if (circuitbreaker.check(uri)) {
-      throw new Error(`service ${name} is unavailable`)
-    }
-
-    const [result, err] = await func.multiple(protocol.fetch, options)
-
-    if (err) {
-      circuitbreaker.monitor(uri)
-      circuitbreaker.record(uri, false)
-      throw err
-    }
-    else {
-      circuitbreaker.record(uri, true)
-      return result
-    }
+    return await circuitbreaker.call(name, protocol.fetch, options)
   }
   else {
     return await protocol.fetch(options)

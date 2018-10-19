@@ -7,6 +7,7 @@ const service = require('./service')
 const endpoint = require('./endpoint')
 const proxy = require('./proxy')
 const ratelimiting = require('./ratelimiting')
+const circuitbreaker = require('./circuitbreaker')
 
 const defaults = {
   port: 4869,
@@ -69,6 +70,9 @@ module.exports = function createServer(options) {
   for (const name in services) {
     if (services[name].ratelimiting) {
       ratelimiting.init(name, services[name].ratelimiting)
+    }
+    if (services[name].circuitbreaker) {
+      circuitbreaker.init(name, services[name].circuitbreaker)
     }
   }
 

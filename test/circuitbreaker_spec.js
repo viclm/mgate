@@ -2,65 +2,65 @@ const test = require('ava')
 const sinon = require('sinon')
 const circuitbreaker = require('../circuitbreaker')
 
-const uri = 'http://upstream.com/gateway/resource#post'
-
 let clock
 
-test.beforeEach(t => {
+test.before(t => {
   clock = sinon.useFakeTimers()
 })
 
-test.afterEach(t => {
+test.after.always(t => {
   clock.restore()
 })
 
-test.serial('break request if there are more failures in 10 seconds', t => {
-  circuitbreaker.monitor(uri)
+test.serial('break request if the rate of failure reatches the threshold over time', async t => {
+  const cb = new circuitbreaker.CircuitBreaker({
+    monitorTimeout: 10,
+    failureThreshold: 0.5
+  })
+  const available = () => {}
+  const unavailable = () => { throw new Error('unavailable') }
 
-  t.truthy(circuitbreaker.stat(uri))
-  t.is(circuitbreaker.stat(uri).status, 'close')
-  t.false(circuitbreaker.check(uri))
+  t.is(cb.state, 'close')
 
-  circuitbreaker.record(uri, false)
-  circuitbreaker.record(uri, true)
-  circuitbreaker.record(uri, false)
-  circuitbreaker.record(uri, true)
-  circuitbreaker.record(uri, false)
+  cb.call(available)
+  await t.throws(cb.call(unavailable))
 
   clock.tick(10000)
-  t.is(circuitbreaker.stat(uri).status, 'open')
-  t.true(circuitbreaker.check(uri))
+  t.is(cb.state, 'open')
 
-  clock.tick(15000)
-  t.falsy(circuitbreaker.stat(uri))
-  t.false(circuitbreaker.check(uri))
+  await t.throws(cb.call(available))
 })
 
-test.serial('turn on small traffic test after 5 seconds if breaker is open', t => {
-  circuitbreaker.monitor(uri)
+test.serial('turn on a limit traffic after breaker is open for a while', async t => {
+  const cb = new circuitbreaker.CircuitBreaker({
+    monitorTimeout: 10,
+    failureThreshold: 0.5,
+    recoverTimeout: 5
+  })
+  const available = () => {}
+  const unavailable = () => { throw new Error('unavailable') }
 
-  circuitbreaker.record(uri, false)
+  t.is(cb.state, 'close')
+
+  cb.call(available)
+  await t.throws(cb.call(unavailable))
 
   clock.tick(10000)
-  t.is(circuitbreaker.stat(uri).status, 'open')
+  t.is(cb.state, 'open')
 
   clock.tick(5000)
-  t.is(circuitbreaker.stat(uri).status, 'harfopen')
+  t.is(cb.state, 'harfopen')
 
-  circuitbreaker.record(uri, false)
+  await t.throws(cb.call(unavailable))
 
   clock.tick(10000)
-  t.is(circuitbreaker.stat(uri).status, 'open')
-  t.true(circuitbreaker.check(uri))
+  t.is(cb.state, 'open')
 
   clock.tick(5000)
-  t.is(circuitbreaker.stat(uri).status, 'harfopen')
-  let isBlocking = circuitbreaker.check(uri)
-  while (isBlocking === circuitbreaker.check(uri)) {}
+  t.is(cb.state, 'harfopen')
 
-  circuitbreaker.record(uri, true)
+  cb.call(available)
 
   clock.tick(10000)
-  t.falsy(circuitbreaker.stat(uri))
-  t.false(circuitbreaker.check(uri))
+  t.is(cb.state, 'close')
 })
