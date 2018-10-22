@@ -21,6 +21,42 @@ const defaults = {
   },
 }
 
+function prepare() {
+  const protocols = protocol.parse('protocols')
+  const services = service.parse('services')
+  const endpoints = endpoint.parse('endpoints')
+
+  for (const name in services) {
+    if (services[name].ratelimiting) {
+      ratelimiting.init(name, services[name].ratelimiting)
+    }
+    if (services[name].circuitbreaker) {
+      circuitbreaker.init(name, services[name].circuitbreaker)
+    }
+  }
+
+  return { protocols, services, endpoints }
+}
+
+function getProxyHandler(options) {
+  options = Object.assign({}, defaults, options)
+
+  if (options.logger) {
+    logger.configure(options.logger)
+  }
+
+  const { protocols, services, endpoints } = prepare()
+
+  return async function handle(req) {
+    for (let rule of endpoints) {
+      if (rule.path.test(req.path)) {
+        return await proxy.proxy(rule.graph, { request: req, services, protocols })
+      }
+    }
+    throw new Error('do not match any endpoint')
+  }
+}
+
 function createProxyRouter(endpoints, options) {
   const router = new express.Router
 
@@ -35,16 +71,14 @@ function createProxyRouter(endpoints, options) {
   return router
 }
 
-module.exports = function createServer(options) {
+function createServer(options) {
   options = Object.assign({}, defaults, options)
 
   if (options.logger) {
     logger.configure(options.logger)
   }
 
-  const protocols = protocol.parse('protocols')
-  const services = service.parse('services')
-  const endpoints = endpoint.parse('endpoints')
+  const { protocols, services, endpoints } = prepare()
 
   const app = express()
   app.use(express.json())
@@ -67,15 +101,6 @@ module.exports = function createServer(options) {
     }
   })
 
-  for (const name in services) {
-    if (services[name].ratelimiting) {
-      ratelimiting.init(name, services[name].ratelimiting)
-    }
-    if (services[name].circuitbreaker) {
-      circuitbreaker.init(name, services[name].circuitbreaker)
-    }
-  }
-
   const server = app.listen(options.port)
 
   server.on('listening', () => {
@@ -88,3 +113,6 @@ module.exports = function createServer(options) {
 
   return () => server.close()
 }
+
+module.exports = createServer
+module.exports.getProxyHandler = getProxyHandler
