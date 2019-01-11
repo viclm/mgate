@@ -16,7 +16,7 @@ exports.parse = function parse(dir) {
     const na = a.filename.match(rslash).length
     const nb = b.filename.match(rslash).length
     if (na === nb) {
-      return Number(rindex.test(a.filename))
+      return Number(rindex.test(a.filename)) || -Number(rindex.test(b.filename))
     }
     return nb - na
   })
