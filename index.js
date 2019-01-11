@@ -21,7 +21,13 @@ const defaults = {
   },
 }
 
-function prepare() {
+function getProxyHandler(options) {
+  options = Object.assign({}, defaults, options)
+
+  if (options.logger) {
+    logger.configure(options.logger)
+  }
+
   const protocols = protocol.parse('protocols')
   const services = service.parse('services')
   const endpoints = endpoint.parse('endpoints')
@@ -35,21 +41,9 @@ function prepare() {
     }
   }
 
-  return { protocols, services, endpoints }
-}
-
-function getProxyHandler(options) {
-  options = Object.assign({}, defaults, options)
-
-  if (options.logger) {
-    logger.configure(options.logger)
-  }
-
-  const { protocols, services, endpoints } = prepare()
-
   return async function handle(req) {
     for (let rule of endpoints) {
-      if (rule.path.test(req.path)) {
+      if (rule.path.test(req.path) && rule.method === req.method.toLowerCase()) {
         return await proxy.proxy(rule.graph, { request: req, services, protocols })
       }
     }
@@ -57,28 +51,8 @@ function getProxyHandler(options) {
   }
 }
 
-function createProxyRouter(endpoints, options) {
-  const router = new express.Router
-
-  endpoints.forEach(rule => {
-    debug('endpoint router, path: %s, method: %s', rule.path, rule.method)
-    router[rule.method](rule.path, async (req, res, next) => {
-      res.locals.proxy = await func.multiple(proxy.proxy, rule.graph, Object.assign({ request: req }, options))
-      next('router')
-    })
-  })
-
-  return router
-}
-
 function createServer(options) {
   options = Object.assign({}, defaults, options)
-
-  if (options.logger) {
-    logger.configure(options.logger)
-  }
-
-  const { protocols, services, endpoints } = prepare()
 
   const app = express()
   app.use(express.json())
@@ -86,19 +60,18 @@ function createServer(options) {
 
   options.middlewares.forEach(middleware => app.use(middleware))
 
-  app.use(createProxyRouter(endpoints, { services, protocols }))
+  const proxyHandle = getProxyHandler({ logger: options.logger })
+  const response = options.response
 
   app.use((req, res, next) => {
-    if (res.locals.proxy) {
-      const [ data, err ] = res.locals.proxy
-      if (err) {
-        logger.error(err)
-      }
-      res.json(options.response.call(null, err, data))
-    }
-    else {
-      res.status(404).end()
-    }
+    proxyHandle(req)
+    .then(json => {
+      res.json(response(null, json))
+    })
+    .catch(err => {
+      res.json(response(err))
+      logger.error(err)
+    })
   })
 
   const server = app.listen(options.port)
