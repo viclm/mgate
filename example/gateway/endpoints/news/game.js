@@ -7,8 +7,8 @@ exports.get = {
         method: 'sanguosha',
       }
     },
-    convert({ sanguosha }) {
-      return sanguosha.map(article => article.title)
+    convert(result) {
+      return result.map(article => article.title)
     }
   },
 
@@ -22,8 +22,8 @@ exports.get = {
         }
       }
     },
-    convert({ xbox }) {
-      return xbox.data.map(article => article.Title)
+    convert(result) {
+      return result.data.map(article => article.Title)
     }
   }
 

@@ -1,6 +1,5 @@
 const protobuf = require('protobufjs')
 const debug = require('debug')('mgate:service')
-const func = require('./utils/func')
 const fsp = require('./utils/fsp')
 const ratelimiting = require('./ratelimiting')
 const circuitbreaker = require('./circuitbreaker')
@@ -50,12 +49,12 @@ exports.parse = function parse(dir) {
   const modules = fsp.findModules(dir)
   debug('resolved service module files %O', modules)
 
-  const services = modules.reduce((accumulator, { name, module }) => {
+  const services = modules.reduce((services, { name, module }) => {
     if (module.idl && rhttp.test(module.protocol)) {
       module.verify = loadProtobuf(module.idl)
     }
-    accumulator[name] = module
-    return accumulator
+    services[name] = module
+    return services
   }, {})
 
   return services
@@ -85,5 +84,4 @@ exports.fetch = async function fetch(services, protocols, name, options) {
   else {
     return await protocol.fetch(options)
   }
-
 }

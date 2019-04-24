@@ -4,11 +4,25 @@ const debug = require('debug')('mgate:endpoint')
 const fsp = require('./utils/fsp')
 
 const rindex = /\bindex(?:\.js)?$/
-const rHttpMethod = /^get|head|post|put|delete|connect|options|trace$/
+const rhttpMethod = /^get|head|post|put|delete|connect|options|trace$/
 const rslash = /\//g
 
-exports.parse = function parse(dir) {
-  let modules = fsp.findModules(dir)
+function promisify(func) {
+  return (...args) => {
+    let ret
+    try {
+      ret = func(...args)
+    }
+    catch (err) {
+      return Promise.reject(err)
+    }
+
+    return ret instanceof Promise ? ret : Promise.resolve(ret)
+  }
+}
+
+exports.parse = function parse(dirname) {
+  let modules = fsp.findModules(dirname)
 
   debug('resolved endpoint module files %O', modules)
 
@@ -21,22 +35,30 @@ exports.parse = function parse(dir) {
     return nb - na
   })
   
-  modules = modules.reduce((accumulator, { name, filename, module }) => {
-    return accumulator.concat(
-      Object.keys(module)
-      .filter(method => {
-        return rHttpMethod.test(method)
-      })
+  modules = modules.reduce((modules, { name, filename, module }) => {
+    return modules.concat(
+      Reflect.ownKeys(module)
+      .filter(method => rhttpMethod.test(method))
       .map(method => {
+        const graph = module[method]
+
+        for (let key in graph) {
+          const { prefilter, convert, fallback } = graph[key]
+          graph[key] = {
+            prefilter: prefilter ? promisify(prefilter) : () => Promise.resolve([]),
+            convert: convert ? promisify(convert) : result => Promise.resolve(result),
+            fallback: fallback ? promisify(fallback) : err => Promise.reject(err)
+          }
+        }
+
         return {
-          path: pathToRegexp('/' + path.relative(dir, filename).slice(0, -3).replace(rindex, '*')),
-          method: method,
-          graph: module[method]
+          path: pathToRegexp('/' + path.relative(dirname, filename).slice(0, -3).replace(rindex, '*')),
+          method,
+          graph
         }
       })
     )
   }, [])
 
   return modules
-
 }

@@ -1,5 +1,4 @@
 const debug = require('debug')('mgate:proxy')
-const func = require('./utils/func')
 const service = require('./service')
 
 class UnresolvedDependencyError extends Error {}
@@ -8,28 +7,18 @@ exports.proxy = async function proxy(graph, options) {
   debug('proxy start')
   debug('graph %o', graph)
 
-  const {
-    services,
-    protocols,
-    request = null
-  } = options
+  const { services, protocols, request = null } = options
 
-  const resolvedGraph = {
-    request: {
-      public: false,
-      resolved: request,
-    }
-  }
-
-  Object.keys(graph).forEach(key => {
+  const resolvedGraph = Reflect.ownKeys(graph).reduce((obj, key) => {
     const rk = key.charAt(0) === '#' ? key.substr(1) : key
-    resolvedGraph[rk] = {
+    obj[rk] = {
       public: rk === key,
       original: graph[key],
       depends: [],
       resolved: undefined
     }
-  })
+    return obj
+  }, {})
 
   const graphContext = new Proxy(resolvedGraph, {
     get(target, name) {
@@ -52,42 +41,24 @@ exports.proxy = async function proxy(graph, options) {
     let result = null, hasThrown = false
 
     try {
-      if (prefilter) {
-        const fetchOptions = await func.promisify(prefilter, new Proxy(graphContext, {}))
+      const fetchOptions = await prefilter(request, new Proxy(graphContext, {}))
+      if (!fetchOptions) {
+        return
+      }
 
-        if (!fetchOptions) {
-          return
-        }
-
-        let requestErr
-
+      try {
         if (Array.isArray(fetchOptions)) {
-          [result, requestErr] = await func.multiple(
-            Promise.all.bind(Promise),
-            fetchOptions.map(o => service.fetch(services, protocols, o.service, o))
-          )
+          result = await Promise.all(fetchOptions.map(o => service.fetch(services, protocols, o.service, o)))
         }
         else {
-          [result, requestErr] = await func.multiple(
-            service.fetch, services, protocols, fetchOptions.service, fetchOptions
-          )
-        }
-
-        if (requestErr) {
-          if (fallback) {
-            result = await func.promisify(fallback, new Proxy(graphContext, {}))
-          }
-          else {
-            throw requestErr
-          }
+          result = await service.fetch(services, protocols, fetchOptions.service, fetchOptions)
         }
       }
-
-      if (convert) {
-        result = await func.promisify(convert, new Proxy(graphContext, {
-          get(target, name) { return name === fieldKey ? result : target[name] }
-        }))
+      catch (err) {
+        result = await fallback(err, new Proxy(graphContext, {}))
       }
+
+      result = await convert(result, new Proxy(graphContext, {}))
     }
     catch (err) {
       hasThrown = true
@@ -106,7 +77,7 @@ exports.proxy = async function proxy(graph, options) {
   }
 
   async function resolve(resolvedGraph) {
-    const checkRemains = () => Object.keys(resolvedGraph).filter(i => resolvedGraph[i].resolved === undefined)
+    const checkRemains = () => Reflect.ownKeys(resolvedGraph).filter(key => resolvedGraph[key].resolved === undefined)
     const remains = checkRemains()
 
     debug('unresolved graph keys %o', remains)

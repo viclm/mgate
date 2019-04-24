@@ -15,6 +15,18 @@ const ProxyOptions = {
   }
 }
 
+const proxyWrapper = (graph, options = ProxyOptions) => {
+  for (let key in graph) {
+    const { prefilter, convert, fallback } = graph[key]
+    graph[key] = {
+      prefilter: prefilter || (() => Promise.resolve([])),
+      convert: convert || (result => Promise.resolve(result)),
+      fallback: fallback || (err => Promise.reject(err))
+    }
+  }
+  return proxy(graph, options)
+}
+
 let server
 
 test.cb.before(t => {
@@ -33,9 +45,9 @@ test.after.always(t => {
 test('proxy single request', async t => {
   t.plan(3)
 
-  await proxy({
+  await proxyWrapper({
     xxx: {
-      prefilter() {
+      async prefilter() {
         return {
           service: 'local',
           path: '/api/xxx',
@@ -43,11 +55,11 @@ test('proxy single request', async t => {
         }
       }
     }
-  }, ProxyOptions).then(result => t.deepEqual(result, { xxx: '[GET]xxx' }))
+  }).then(result => t.deepEqual(result, { xxx: '[GET]xxx' }))
 
-  const error = await t.throws(proxy({
+  const error = await t.throws(proxyWrapper({
     xxx: {
-      prefilter() {
+      async prefilter() {
         return {
           service: 'local',
           path: '/error_api/xxx',
@@ -55,7 +67,7 @@ test('proxy single request', async t => {
         }
       }
     }
-  }, ProxyOptions))
+  }))
 
   t.is(error.message, '404')
 })
@@ -63,9 +75,9 @@ test('proxy single request', async t => {
 test('merge multiple undependent request', async t => {
   t.plan(1)
 
-  await proxy({
+  await proxyWrapper({
     x1:{
-      prefilter() {
+      async prefilter() {
         return {
           service: 'local',
           path: '/api/x1',
@@ -74,7 +86,7 @@ test('merge multiple undependent request', async t => {
       }
     },
     x2:{
-      prefilter() {
+      async prefilter() {
         return {
           service: 'local',
           path: '/api/x2',
@@ -82,16 +94,16 @@ test('merge multiple undependent request', async t => {
         }
       }
     }
-  }, ProxyOptions).then(result => t.deepEqual(result, { x1: '[GET]x1', x2: '[POST]x2' }))
+  }).then(result => t.deepEqual(result, { x1: '[GET]x1', x2: '[POST]x2' }))
 
 })
 
 test('merge multiple dependent request', async t => {
   t.plan(2)
 
-  await proxy({
+  await proxyWrapper({
     x1:{
-      prefilter() {
+      async prefilter() {
         return {
           service: 'local',
           path: '/api/x1',
@@ -100,7 +112,7 @@ test('merge multiple dependent request', async t => {
       }
     },
     x2:{
-      prefilter({ x1 }) {
+      async prefilter(request, { x1 }) {
         return {
           service: 'local',
           path: '/api/x2',
@@ -108,27 +120,27 @@ test('merge multiple dependent request', async t => {
         }
       }
     },
-  }, ProxyOptions).then(result => t.deepEqual(result, { x1: '[GET]x1', x2: '[POST]x2' }))
+  }).then(result => t.deepEqual(result, { x1: '[GET]x1', x2: '[POST]x2' }))
 
-  await t.throws(proxy({
+  await t.throws(proxyWrapper({
     xxx:{
-      prefilter({ yyy }) {
+      async prefilter(request, { yyy }) {
         return {
           service: 'local',
           path: '/api/xxx',
         }
       }
     },
-  }, ProxyOptions))
+  }))
 
 })
 
 test('return false in prefilter to skip a request', async t => {
   t.plan(2)
 
-  await proxy({
+  await proxyWrapper({
     xxx:{
-      prefilter() {
+      async prefilter() {
         return {
           service: 'local',
           path: '/api/xxx',
@@ -136,11 +148,11 @@ test('return false in prefilter to skip a request', async t => {
       }
     },
     yyy:{
-      prefilter() {
+      async prefilter() {
         return false
       }
     }
-  }, ProxyOptions).then(result => {
+  }).then(result => {
     t.deepEqual(result, { xxx: '[GET]xxx', 'yyy': null })
     t.notDeepEqual(result, { xxx: '[GET]xxx', yyy: '[GET]yyy' })
   })
@@ -150,58 +162,59 @@ test('return false in prefilter to skip a request', async t => {
 test('private key is not contained in the final response', async t => {
   t.plan(1)
 
-  await proxy({
+  await proxyWrapper({
     xxx:{
-      prefilter({ yyy }) {
+      async prefilter(request, { yyy }) {
         return {
           service: 'local',
           path: '/api/xxx',
         }
       }
     },
-    '#yyy':{
-      prefilter() {
+    '#yyy': {
+      async prefilter() {
         return {
           service: 'local',
           path: '/api/yyy',
         }
       }
     }
-  }, ProxyOptions).then(result => t.deepEqual(result, { xxx: '[GET]xxx' }))
+  }).then(result => t.deepEqual(result, { xxx: '[GET]xxx' }))
 })
 
 test('use convert function to transform the request result', async t => {
   t.plan(1)
 
-  await proxy({
+  await proxyWrapper({
     xxx:{
-      prefilter() {
+      async prefilter() {
         return {
           service: 'local',
           path: '/api/xxx',
         }
       },
-      convert({ xxx }) {
-        return xxx.replace(/x/g, 'y')
+      async convert(result) {
+        return result.replace(/x/g, 'y')
       }
     }
-  }, ProxyOptions).then(result => t.deepEqual(result, { xxx: '[GET]yyy' }))
+  }).then(result => t.deepEqual(result, { xxx: '[GET]yyy' }))
 })
 
 test('use fallback function to fake result when a request broken', async t => {
-  t.plan(1)
+  t.plan(2)
 
-  await proxy({
+  await proxyWrapper({
     xxx:{
-      prefilter() {
+      async prefilter() {
         return {
           service: 'local',
           path: '/error_api/xxx',
         }
       },
-      fallback() {
+      async fallback(err) {
+        t.true(err instanceof Error)
         return '[FALLBACK]xxx'
       }
     }
-  }, ProxyOptions).then(result => t.deepEqual(result, { xxx: '[FALLBACK]xxx' }))
+  }).then(result => t.deepEqual(result, { xxx: '[FALLBACK]xxx' }))
 })

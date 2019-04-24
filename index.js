@@ -1,7 +1,6 @@
 const express = require('express')
 const debug = require('debug')('mgate:index')
 const logger = require('./utils/logger')
-const func = require('./utils/func')
 const protocol = require('./protocol')
 const service = require('./service')
 const endpoint = require('./endpoint')
@@ -15,7 +14,7 @@ const defaults = {
   middlewares: [],
   response(err, data) {
     return {
-      error: err ? { message: err.message } : null,
+      error: err ? { message: err.message, stack: err.stack } : null,
       data: data
     }
   },

@@ -1,7 +1,7 @@
 exports.get = {
 
   topfive: {
-    convert({ serieA, rest }) {
+    convert(result, { serieA, rest }) {
       return serieA.slice(0, 1).concat(Object.keys(rest).map(league => rest[league][0]))
     }
   },
@@ -16,8 +16,8 @@ exports.get = {
         }
       }
     },
-    convert({ serieA }) {
-      return serieA.result
+    convert(result) {
+      return result.result
         .map(article => article.title)
     }
   },
@@ -34,12 +34,11 @@ exports.get = {
         }
       })
     },
-    convert({ rest }) {
-      const restMap = {};
-      ['英超', '西甲', '德甲', '中超'].forEach((league, index) => {
-        restMap[league] = rest[index].result.map(article => article.title)
-      })
-      return restMap
+    convert(result) {
+      return ['英超', '西甲', '德甲', '中超'].reduce((obj, league, index) => {
+        obj[league] = result[index].result.map(article => article.title)
+        return obj
+      }, {})
     }
   }
 

@@ -1,14 +1,14 @@
 exports.get = {
 
   qq: {
-    prefilter({ request }) {
+    prefilter() {
       return {
         service: 'qq',
         path: 'xw/topNews',
       }
     },
-    convert({ qq }) {
-      return qq.data
+    convert(result) {
+      return result.data
         .map(article => article.title)
     }
   },

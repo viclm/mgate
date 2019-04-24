@@ -8,9 +8,8 @@ exports.parse = function parse(dir) {
   const modules = builtinModules.concat(constomModules)
 
   debug('resolved protocol module files %O', modules)
-  return modules.reduce((accumulator, { name, module }) => {
-    accumulator[name] = module
-    return accumulator
+  return modules.reduce((protocols, { name, module }) => {
+    protocols[name] = module
+    return protocols
   }, {})
-
 }

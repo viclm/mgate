@@ -1,6 +1,6 @@
 exports.get = {
   location: {
-    prefilter({ request }) {
+    prefilter(request) {
       return {
         service: 'graphloc',
         path: 'graphql',
@@ -19,18 +19,18 @@ exports.get = {
         }
       }
     },
-    convert({ location }) {
-      if (location.errors) {
-        throw new Error(location.errors[0].message)
+    convert(result) {
+      if (result.errors) {
+        throw new Error(result.errors[0].message)
       }
-      return location.data.getLocation ? location.data.getLocation.city.names.en : null
+      return result.data.getLocation ? result.data.getLocation.city.names.en : null
     }
   }
 }
 
 exports.post = {
   location: {
-    prefilter({ request }) {
+    prefilter(request) {
       return {
         service: 'graphloc',
         path: 'graphql',
@@ -39,8 +39,8 @@ exports.post = {
         data: request.body
       }
     },
-    convert({ location }) {
-      return location.data
+    convert(result) {
+      return result.data
     }
   }
 }

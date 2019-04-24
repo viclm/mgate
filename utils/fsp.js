@@ -1,28 +1,27 @@
 const fs = require('fs')
 const path = require('path')
 
-const rjs = /\.js$/
+exports.findModules = function findModules(dirname) {
+  if (!fs.existsSync(dirname)) { return [] }
 
-exports.findModules = function findModules(dir) {
-  if (!fs.existsSync(dir)) {
-    return []
-  }
-  dir = path.resolve(dir)
-  return fs.readdirSync(dir)
-    .map(filename => path.join(dir, filename))
-    .reduce((accumulator, filename) => {
+  dirname = path.resolve(dirname)
+
+  return fs.readdirSync(dirname)
+    .map(filename => path.join(dirname, filename))
+    .reduce((modules, filename) => {
       const stat = fs.statSync(filename)
       if (stat.isDirectory()) {
-        return accumulator.concat(findModules(filename))
+        return modules.concat(findModules(filename))
       }
-      else if (stat.isFile() && rjs.test(filename)) {
-        accumulator.push({
+
+      if (stat.isFile() && path.extname(filename) === '.js') {
+        modules.push({
           name: path.basename(filename, '.js'),
           filename: filename,
           module: require(filename)
         })
-        return accumulator
       }
-      return accumulator
+
+      return modules
     }, [])
 }
