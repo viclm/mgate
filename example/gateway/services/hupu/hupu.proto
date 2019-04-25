@@ -3,7 +3,7 @@ syntax = "proto3";
 package hupu;
 
 service Hupu {
-  rpc getHomeLatestNews(LNReq) returns (LNRes) {}
+  rpc HomeLatestNews(LNReq) returns (LNRes) {}
 }
 
 message LNReq {

@@ -3,8 +3,20 @@ const sinon = require('sinon')
 const Busboy = require('busboy')
 const createServer = require('http').createServer
 const zlib = require('zlib')
-const http = require('../protocols/http').http
-const https = require('../protocols/http').https
+const http = require('../protocols/http')
+
+const httpWrapper = options => {
+  return new Promise((resolve, reject) => {
+    http.http(options, (err, body) => {
+      if (err) {
+        reject(err)
+      }
+      else {
+        resolve(body)
+      }
+    })
+  })
+}
 
 let server
 
@@ -37,12 +49,12 @@ test.serial('timeout', async t => {
     setTimeout(() => res.end('ok'), 50)
   })
 
-  await t.throws(http({
+  await t.throws(httpWrapper({
     url: `${server.url}/api/1`,
     timeout: 10
   }))
 
-  const result = await http({
+  const result = await httpWrapper({
     url: `${server.url}/api/1`,
     timeout: 90
   })
@@ -62,11 +74,11 @@ test.serial('method', async t => {
     res.end()
   })
 
-  await http({
+  await httpWrapper({
     url: `${server.url}/api/1`,
   })
 
-  await http({
+  await httpWrapper({
     url: `${server.url}/api/2`,
     method: 'post'
   })
@@ -82,7 +94,7 @@ test.serial('headers', async t => {
     res.end()
   })
 
-  await http({
+  await httpWrapper({
     url: `${server.url}/api/1`,
     headers: {
       'content-type': 'application/json',
@@ -107,7 +119,7 @@ test.serial('send data', async t => {
     })
   })
 
-  await http({
+  await httpWrapper({
     url: `${server.url}/api/1`,
     method: 'get',
     data: {
@@ -115,7 +127,7 @@ test.serial('send data', async t => {
     }
   })
 
-  await http({
+  await httpWrapper({
     url: `${server.url}/api/2`,
     method: 'post',
     data: {
@@ -137,7 +149,7 @@ test.serial('application/octet-stream', async t => {
     })
   })
 
-  await http({
+  await httpWrapper({
     url: `${server.url}/api/1`,
     method: 'post',
     data: Buffer.from('abcdef', 'hex'),
@@ -158,7 +170,7 @@ test.serial('text/plain', async t => {
     })
   })
 
-  await http({
+  await httpWrapper({
     url: `${server.url}/api/1`,
     method: 'post',
     data: 'foo',
@@ -179,7 +191,7 @@ test.serial('application/x-www-form-urlencoded', async t => {
     })
   })
 
-  await http({
+  await httpWrapper({
     url: `${server.url}/api/1`,
     method: 'post',
     data: {
@@ -208,7 +220,7 @@ test.serial('application/json', async t => {
     })
   })
 
-  await http({
+  await httpWrapper({
     url: `${server.url}/api/1`,
     method: 'post',
     data: {
@@ -232,7 +244,7 @@ test.serial('multipart/form-data', async t => {
     req.pipe(busboy)
   })
 
-  await http({
+  await httpWrapper({
     url: `${server.url}/api/1`,
     method: 'post',
     data: {
@@ -263,17 +275,17 @@ test.serial('json', async t => {
     res.end()
   })
 
-  const result1 = await http({
+  const result1 = await httpWrapper({
     url: `${server.url}/api/1`
   })
   t.deepEqual(result1, { foo: 'bar' })
 
-  const result2 = await http({
+  const result2 = await httpWrapper({
     url: `${server.url}/api/2`
   })
   t.is(result2, '{"foo": "bar"}')
 
-  await t.throws(http({
+  await t.throws(httpWrapper({
     url: `${server.url}/api/3`
   }))
 
@@ -286,7 +298,7 @@ test.serial('unvalid datatype', async t => {
     res.end('ok')
   })
 
-  await t.throws(http({
+  await t.throws(httpWrapper({
     url: `${server.url}/api/1`,
     method: 'post',
     data: {
@@ -312,12 +324,12 @@ test.serial('gzip', async t => {
     res.end()
   })
 
-  const result = await http({
+  const result = await httpWrapper({
     url: `${server.url}/api/1`
   })
   t.is(result, 'ok')
 
-  await t.throws(http({
+  await t.throws(httpWrapper({
     url: `${server.url}/api/2`
   }))
 
@@ -347,7 +359,7 @@ test.serial('https', async t => {
     })
   })
 
-  const result = await https({
+  const result = await httpWrapper({
     url: `https://localhost:${server.address().port}/api/i`
   })
   t.is(result, 'ok')

@@ -5,7 +5,7 @@ class UnresolvedDependencyError extends Error {}
 
 exports.proxy = async function proxy(graph, options) {
   debug('proxy start')
-  debug('graph %o', graph)
+  debug('graph %O', graph)
 
   const { services, protocols, request = null } = options
 
@@ -80,7 +80,7 @@ exports.proxy = async function proxy(graph, options) {
     const checkRemains = () => Reflect.ownKeys(resolvedGraph).filter(key => resolvedGraph[key].resolved === undefined)
     const remains = checkRemains()
 
-    debug('unresolved graph keys %o', remains)
+    debug('unresolved graph keys %O', remains)
     await Promise.all(remains.map(key => resolveField(key, resolvedGraph[key])))
 
     const rs = checkRemains()

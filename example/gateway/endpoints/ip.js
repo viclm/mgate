@@ -3,7 +3,7 @@ exports.get = {
     prefilter(request) {
       return {
         service: 'graphloc',
-        path: 'graphql',
+        pathname: 'graphql',
         method: 'post',
         datatype: 'json',
         data: {
@@ -33,7 +33,7 @@ exports.post = {
     prefilter(request) {
       return {
         service: 'graphloc',
-        path: 'graphql',
+        pathname: 'graphql',
         method: 'post',
         datatype: 'json',
         data: request.body

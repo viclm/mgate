@@ -50,7 +50,7 @@ test('proxy single request', async t => {
       async prefilter() {
         return {
           service: 'local',
-          path: '/api/xxx',
+          pathname: '/api/xxx',
           method: 'get',
         }
       }
@@ -62,7 +62,7 @@ test('proxy single request', async t => {
       async prefilter() {
         return {
           service: 'local',
-          path: '/error_api/xxx',
+          pathname: '/error_api/xxx',
           method: 'get',
         }
       }
@@ -80,7 +80,7 @@ test('merge multiple undependent request', async t => {
       async prefilter() {
         return {
           service: 'local',
-          path: '/api/x1',
+          pathname: '/api/x1',
           method: 'get',
         }
       }
@@ -89,7 +89,7 @@ test('merge multiple undependent request', async t => {
       async prefilter() {
         return {
           service: 'local',
-          path: '/api/x2',
+          pathname: '/api/x2',
           method: 'post',
         }
       }
@@ -106,7 +106,7 @@ test('merge multiple dependent request', async t => {
       async prefilter() {
         return {
           service: 'local',
-          path: '/api/x1',
+          pathname: '/api/x1',
           method: 'get',
         }
       }
@@ -115,7 +115,7 @@ test('merge multiple dependent request', async t => {
       async prefilter(request, { x1 }) {
         return {
           service: 'local',
-          path: '/api/x2',
+          pathname: '/api/x2',
           method: 'post',
         }
       }
@@ -127,7 +127,7 @@ test('merge multiple dependent request', async t => {
       async prefilter(request, { yyy }) {
         return {
           service: 'local',
-          path: '/api/xxx',
+          pathname: '/api/xxx',
         }
       }
     },
@@ -143,7 +143,7 @@ test('return false in prefilter to skip a request', async t => {
       async prefilter() {
         return {
           service: 'local',
-          path: '/api/xxx',
+          pathname: '/api/xxx',
         }
       }
     },
@@ -167,7 +167,7 @@ test('private key is not contained in the final response', async t => {
       async prefilter(request, { yyy }) {
         return {
           service: 'local',
-          path: '/api/xxx',
+          pathname: '/api/xxx',
         }
       }
     },
@@ -175,7 +175,7 @@ test('private key is not contained in the final response', async t => {
       async prefilter() {
         return {
           service: 'local',
-          path: '/api/yyy',
+          pathname: '/api/yyy',
         }
       }
     }
@@ -190,7 +190,7 @@ test('use convert function to transform the request result', async t => {
       async prefilter() {
         return {
           service: 'local',
-          path: '/api/xxx',
+          pathname: '/api/xxx',
         }
       },
       async convert(result) {
@@ -208,7 +208,7 @@ test('use fallback function to fake result when a request broken', async t => {
       async prefilter() {
         return {
           service: 'local',
-          path: '/error_api/xxx',
+          pathname: '/error_api/xxx',
         }
       },
       async fallback(err) {

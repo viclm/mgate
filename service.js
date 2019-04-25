@@ -1,57 +1,15 @@
-const protobuf = require('protobufjs')
+const url = require('url')
 const debug = require('debug')('mgate:service')
 const fsp = require('./utils/fsp')
 const circuitbreaker = require('./circuitbreaker')
 
 const rhttp = /^http[s2]?$/
 
-function loadProtobuf(path) {
-  const lookup = (obj, type, parentName) => {
-    let result = []
-    let fullname = parentName + obj.name
-    if (obj instanceof type) {
-      result.push([fullname, obj])
-    }
-    if (obj.hasOwnProperty('nested')) {
-      result = obj.nestedArray.reduce((arr, child) => {
-        return arr.concat(lookup(child, type, fullname + '.'))
-      }, result)
-    }
-    return result
-  }
-
-  const root = protobuf.loadSync(path)
-  const namespace = root.nestedArray[0]
-  const services = lookup(namespace, protobuf.Service, '')
-  const types = lookup(namespace, protobuf.Type, '').reduce((obj, item) => {
-    obj[item[0]] = item[1]
-    return obj
-  }, {})
-
-  const resolved = services.reduce((obj, item) => {
-    const [name, service] = item
-    for (let name in service.methods) {
-      const requestType  = types[namespace.name + '.' + service.methods[name].requestType]
-      const responseType  = types[namespace.name + '.' + service.methods[name].responseType]
-      obj[name] = {
-        request: payload => requestType.verify(payload),
-        response: result => responseType.verify(result),
-      }
-    }
-    return obj
-  }, {})
-
-  return resolved
-}
-
 exports.parse = function parse(dir) {
   const modules = fsp.findModules(dir)
   debug('resolved service module files %O', modules)
 
   const services = modules.reduce((services, { name, module }) => {
-    if (module.idl && rhttp.test(module.protocol)) {
-      module.verify = loadProtobuf(module.idl)
-    }
     services[name] = module
     return services
   }, {})
@@ -65,12 +23,19 @@ exports.fetch = async function fetch(services, protocols, name, options) {
   if (!service) {
     throw new Error(`service ${name} isn't registered`)
   }
-  options.service = service
 
-  let protocol = protocols[rhttp.test(service.protocol) ? 'http' : service.protocol]
-
-  if (!protocol) {
-    throw new Error(`protocol ${service.protocol} isn't supported`)
+  let protocol
+  if (rhttp.test(service.protocol)) {
+    options.url = url.resolve(service.address, options.pathname)
+    options.http2 = service.protocol === 'http2'
+    options.protobuf = service.protobuf
+    protocol = protocols.http
+  }
+  else {
+    protocol = protocols[service.protocol]
+    if (!protocol) {
+      throw new Error(`protocol ${service.protocol} isn't supported`)
+    }
   }
 
   if (service.ratelimiting && !service.ratelimiting.acquire()) {

@@ -4,7 +4,7 @@ exports.get = {
     prefilter() {
       return {
         service: 'qq',
-        path: 'xw/topNews',
+        pathname: 'xw/topNews',
       }
     },
     convert(result) {

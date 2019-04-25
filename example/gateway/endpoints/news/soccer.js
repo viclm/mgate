@@ -10,7 +10,7 @@ exports.get = {
     prefilter() {
       return {
         service: 'hupu',
-        path: 'home/latest-news',
+        pathname: 'home/latest-news',
         data: {
           league: '意甲',
         }
@@ -27,7 +27,7 @@ exports.get = {
       return ['英超', '西甲', '德甲', '中超'].map(league => {
         return {
           service: 'hupu',
-          path: 'home/latest-news',
+          pathname: 'home/latest-news',
           data: {
             league,
           }
