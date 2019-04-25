@@ -1,8 +1,9 @@
 const debug = require('debug')('mgate:ratelimiter')
 
 class RateLimiter {
-  constructor(permitsPerSecond, maxBurstSeconds) {
+  constructor(permitsPerSecond, maxBurstSeconds = 1) {
     this.permitsPerSecond = permitsPerSecond
+    this.stableIntervalMicros = 1000 / permitsPerSecond
     this.maxPermits = permitsPerSecond * maxBurstSeconds
     this.storedPermits = 0
     this.nextFreeTicketMicros = Date.now()
@@ -11,7 +12,7 @@ class RateLimiter {
   resync(nowMicros) {
     if (nowMicros > this.nextFreeTicketMicros) {
       debug('resync to now')
-      this.storedPermits = Math.min(this.maxPermits, this.storedPermits + (nowMicros - this.nextFreeTicketMicros) / (1 / this.permitsPerSecond * 1000))
+      this.storedPermits = Math.min(this.maxPermits, this.storedPermits + (nowMicros - this.nextFreeTicketMicros) / this.stableIntervalMicros)
       this.nextFreeTicketMicros = nowMicros
     }
   }
@@ -27,7 +28,7 @@ class RateLimiter {
       debug('acquire ahead of time')
       const freshPermits = permits - this.storedPermits
       this.storedPermits = 0
-      this.nextFreeTicketMicros += (1 / this.permitsPerSecond * 1000) * freshPermits
+      this.nextFreeTicketMicros += this.stableIntervalMicros * freshPermits
     }
     return true
   }
@@ -35,6 +36,6 @@ class RateLimiter {
 
 exports.RateLimiter = RateLimiter
 
-exports.create = function create(permitsPerSecond, maxBurstSeconds = 1) {
-  return new RateLimiter(permitsPerSecond, maxBurstSeconds)
+exports.create = function create() {
+  return new RateLimiter(...arguments)
 }

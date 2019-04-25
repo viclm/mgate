@@ -5,47 +5,47 @@ const circuitbreaker = require('./circuitbreaker')
 
 const rhttp = /^http[s2]?$/
 
-exports.parse = function parse(dir) {
-  const modules = fsp.findModules(dir)
+exports.parse = function parse(dirname) {
+  const modules = fsp.findModules(dirname)
   debug('resolved service module files %O', modules)
 
-  const services = modules.reduce((services, { name, module }) => {
+  return modules.reduce((services, { name, module }) => {
     services[name] = module
     return services
   }, {})
-
-  return services
 }
 
-exports.fetch = async function fetch(services, protocols, name, options) {
-  debug('fetch data from %s', name)
-  const service = services[name]
-  if (!service) {
-    throw new Error(`service ${name} isn't registered`)
+exports.fetch = async function fetch(protocols, services, serviceName, fetchOptions) {
+  debug('fetch data from %s', serviceName)
+  if (!(serviceName in services)) {
+    throw new Error(`service ${serviceName} isn't registered`)
   }
 
-  let protocol
-  if (rhttp.test(service.protocol)) {
-    options.url = url.resolve(service.address, options.pathname)
-    options.http2 = service.protocol === 'http2'
-    options.protobuf = service.protobuf
-    protocol = protocols.http
+  const {
+    protocol: protocolName,
+    protobuf: protoFileName,
+    address,
+    ratelimiting,
+    circuitbreaker
+  } = services[serviceName]
+
+  let fetchFn
+  if (rhttp.test(protocolName)) {
+    fetchOptions.url = url.resolve(address, fetchOptions.pathname)
+    fetchOptions.http2 = protocolName === 'http2'
+    fetchOptions.protobuf = protoFileName
+    fetchFn = protocols.http.fetch
+  }
+  else if (protocolName in protocols) {
+    fetchFn = protocols[protocolName].fetch
   }
   else {
-    protocol = protocols[service.protocol]
-    if (!protocol) {
-      throw new Error(`protocol ${service.protocol} isn't supported`)
-    }
+    throw new Error(`protocol ${protocolName} isn't supported`)
   }
 
-  if (service.ratelimiting && !service.ratelimiting.acquire()) {
-    throw new Error(`too many requests for service ${name}`)
+  if (ratelimiting && !ratelimiting.acquire()) {
+    throw new Error(`too many requests for service ${serviceName}`)
   }
 
-  if (service.circuitbreaker) {
-    return await circuitbreaker.call(name, protocol.fetch, options)
-  }
-  else {
-    return await protocol.fetch(options)
-  }
+  return circuitbreaker ? await circuitbreaker.call(fetchFn, fetchOptions) : await fetchFn(fetchOptions)
 }

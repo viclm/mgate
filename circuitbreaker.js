@@ -6,10 +6,10 @@ const STATE_HARFOPEN = 'harfopen'
 const STATE_CLOSE = 'close'
 
 class CircuitBreaker {
-  constructor(options = {}) {
-    this.monitorTimeout = options.monitorTimeout || 10
-    this.recoverTimeout = options.recoverTimeout || 5
-    this.failureThreshold = options.failureThreshold || 0.5
+  constructor(monitorTimeout = 10, recoverTimeout = 5, failureThreshold = 0.5) {
+    this.monitorTimeout = monitorTimeout
+    this.recoverTimeout = recoverTimeout
+    this.failureThreshold = failureThreshold
 
     this.state = STATE_CLOSE
     this.monitoring = false
@@ -80,14 +80,8 @@ class CircuitBreaker {
   }
 }
 
-const Poll = {}
-
 exports.CircuitBreaker = CircuitBreaker
 
-exports.init = function init(name, options) {
-  Poll[name] = new CircuitBreaker(options)
-}
-
-exports.call = async function call(name, action, ...args) {
-  return await Poll[name].call(action, ...args)
+exports.create = function create() {
+  return new CircuitBreaker(...arguments)
 }

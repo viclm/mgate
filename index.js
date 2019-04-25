@@ -8,23 +8,27 @@ const proxy = require('./proxy')
 const ratelimiter = require('./ratelimiter')
 const circuitbreaker = require('./circuitbreaker')
 
-const defaults = {
-  port: 4869,
+const ProxyOptionDefaults = {
+  logger: null
+}
+
+const ServerOptionsDefaults = {
   logger: null,
   middlewares: [],
+  port: 4869,
   response(err, data) {
     return {
       error: err ? { message: err.message, stack: err.stack } : null,
-      data: data
+      data
     }
-  },
+  }
 }
 
 function getProxyHandler(options) {
-  options = Object.assign({}, defaults, options)
+  const { logger: loggerOptions } = Object.assign({}, ProxyOptionDefaults, options)
 
-  if (options.logger) {
-    logger.configure(options.logger)
+  if (loggerOptions) {
+    logger.configure(loggerOptions)
   }
 
   const protocols = protocol.parse('protocols')
@@ -33,10 +37,12 @@ function getProxyHandler(options) {
 
   for (const name in services) {
     if (services[name].ratelimiting) {
-      services[name].ratelimiting = ratelimiter.create(services[name].ratelimiting.qps)
+      const { qps } = services[name].ratelimiting.qps
+      services[name].ratelimiting = ratelimiter.create(qps)
     }
     if (services[name].circuitbreaker) {
-      circuitbreaker.init(name, services[name].circuitbreaker)
+      const { monitor, recover, threshold } = services[name].circuitbreaker
+      services[name].circuitbreaker = circuitbreaker.create(monitor, recover, threshold)
     }
   }
 
@@ -51,16 +57,15 @@ function getProxyHandler(options) {
 }
 
 function createServer(options) {
-  options = Object.assign({}, defaults, options)
+  const { logger: loggerOptions, middlewares, port, response } = Object.assign({}, ServerOptionsDefaults, options)
 
   const app = express()
   app.use(express.json())
   app.use(express.urlencoded({ extended: true }))
 
-  options.middlewares.forEach(middleware => app.use(middleware))
+  middlewares.forEach(middleware => app.use(middleware))
 
-  const proxyHandle = getProxyHandler({ logger: options.logger })
-  const response = options.response
+  const proxyHandle = getProxyHandler({ logger: loggerOptions })
 
   app.use((req, res, next) => {
     proxyHandle(req)
@@ -73,10 +78,10 @@ function createServer(options) {
     })
   })
 
-  const server = app.listen(options.port)
+  const server = app.listen(port)
 
   server.on('listening', () => {
-    logger.info(`server running on port ${options.port}`)
+    logger.info(`server running on port ${port}`)
   })
 
   server.on('error', err => {

@@ -61,8 +61,14 @@ test.serial('allow acquire more permits', t => {
 
 test.serial('create wrapper for RateLimiter class', t => {
 
-  const rl = ratelimiter.create(10)
+  const rl = ratelimiter.create(2, 1)
 
   t.true(rl instanceof ratelimiter.RateLimiter)
+
+  clock.tick(2000)
+  t.true(rl.acquire())
+  t.true(rl.acquire())
+  t.true(rl.acquire())
+  t.false(rl.acquire())
 
 })

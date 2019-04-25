@@ -13,10 +13,7 @@ test.after.always(t => {
 })
 
 test.serial('break request if the rate of failure reatches the threshold over time', async t => {
-  const cb = new circuitbreaker.CircuitBreaker({
-    monitorTimeout: 10,
-    failureThreshold: 0.5
-  })
+  const cb = new circuitbreaker.CircuitBreaker(10, undefined, 0.5)
   const available = () => {}
   const unavailable = () => { throw new Error('unavailable') }
 
@@ -32,11 +29,7 @@ test.serial('break request if the rate of failure reatches the threshold over ti
 })
 
 test.serial('turn on a limit traffic after breaker is open for a while', async t => {
-  const cb = new circuitbreaker.CircuitBreaker({
-    monitorTimeout: 10,
-    failureThreshold: 0.5,
-    recoverTimeout: 5
-  })
+  const cb = new circuitbreaker.CircuitBreaker(10, 5, 0.5)
   const available = () => {}
   const unavailable = () => { throw new Error('unavailable') }
 

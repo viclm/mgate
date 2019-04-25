@@ -42,16 +42,15 @@ exports.proxy = async function proxy(graph, options) {
 
     try {
       const fetchOptions = await prefilter(request, new Proxy(graphContext, {}))
-      if (!fetchOptions) {
-        return
-      }
+
+      if (!fetchOptions) { return }
 
       try {
         if (Array.isArray(fetchOptions)) {
-          result = await Promise.all(fetchOptions.map(o => service.fetch(services, protocols, o.service, o)))
+          result = await Promise.all(fetchOptions.map(o => service.fetch(protocols, services, o.service, o)))
         }
         else {
-          result = await service.fetch(services, protocols, fetchOptions.service, fetchOptions)
+          result = await service.fetch(protocols, services, fetchOptions.service, fetchOptions)
         }
       }
       catch (err) {
