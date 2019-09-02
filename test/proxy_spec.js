@@ -69,7 +69,7 @@ test('proxy single request', async t => {
     }
   }))
 
-  t.is(error.message, '404')
+  t.is(error.message, 'http status 404')
 })
 
 test('merge multiple undependent request', async t => {

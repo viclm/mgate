@@ -75,19 +75,21 @@ function http(options, callback) {
   let headers = {}
   let data, formdata
 
-  let done = (err, res) => {
-    const req = {
-      url: options.url,
-      method: method,
-      headers: headers,
-      data: options.data
-    }
-    callback(err, res && res.body, req, res)
+  let reqStat = {
+    url: options.url,
+    method: method,
+    headers: headers,
+    data: options.data,
+    datetime: new Date()
+  }
+
+  let done = (err, resStat) => {
+    callback(err, resStat && resStat.body, reqStat, resStat)
   }
 
   if (options.headers) {
     for (let key in options.headers) {
-      headers[key.toLowerCase()] = options.headers[key]
+      headers[key.toLowerCase()] = options.headers[key] || ''
     }
   }
 
@@ -114,7 +116,7 @@ function http(options, callback) {
       headers['content-length'] = formdata.getLengthSync()
     }
     else {
-      if (datatype === 'urlencoded') {
+      if (datatype === undefined || datatype === 'urlencoded') {
         data = querystring.stringify(options.data)
         headers['content-type'] = 'application/x-www-form-urlencoded'
       }
@@ -173,9 +175,7 @@ function http(options, callback) {
 
   req.on('error', done)
 
-  let timingStart = new Date()
   req.on('response', response => {
-    let timingStop = new Date()
     let headers, status
 
     if (http2) {
@@ -189,11 +189,10 @@ function http(options, callback) {
     }
 
     let res = {
-      timing: {
-        start: timingStart,
-        stop: timingStop
-      },
-      headers, status
+      headers,
+      status,
+      body: null,
+      datetime: new Date()
     }
 
     if (status >= 200 && status < 300 || status === 304) {
@@ -206,33 +205,25 @@ function http(options, callback) {
       response.on('end', () => {
         res.body = Buffer.concat(buffers)
 
-        if (headers['content-encoding'] === 'gzip') {
-          try {
+        try {
+          if (headers['content-encoding'] === 'gzip') {
             res.body = zlib.gunzipSync(res.body)
           }
-          catch (err) {
-            done(err, res)
-            return
-          }
-        }
-
-        res.body = res.body.toString()
-
-        if (rjson.test(headers['content-type'])) {
-          try {
+          res.body = res.body.toString()
+          if (rjson.test(headers['content-type'])) {
             res.body = JSON.parse(res.body)
           }
-          catch (e) {
-            done(new Error('unvalid json'), res)
-            return
-          }
+        }
+        catch (err) {
+          done(err)
+          return
         }
 
         done(null, res)
       })
     }
     else {
-      done(new Error(status), res)
+      done(new Error(`http status ${status}`))
     }
   })
 
